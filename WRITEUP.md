@@ -100,6 +100,7 @@ Example dictionary snippet:
   }
 }
 ```
+[Saved json](dictionary.json)
 
 ## 7. Challenges Faced and Solutions
 
