@@ -1,4 +1,4 @@
-# Technical Writeup: Offline AI Language Learning Application Using Gemma 3n and LangGraph
+<img width="186" height="623" alt="image" src="https://github.com/user-attachments/assets/917e43d8-0c07-4b2f-a812-0289bc33d76e" /># Technical Writeup: Offline AI Language Learning Application Using Gemma 3n and LangGraph
 
 ## 1. Introduction
 
@@ -21,6 +21,7 @@ Key pipeline stages include:
 - **save_to_json:** Merge all data and save the full dictionary to a JSON file.
 
 This structured pipeline ensures modularity, maintainability, and extensibility, facilitating debugging and future improvements.
+<img width="186" height="623" alt="image" src="https://github.com/user-attachments/assets/80a6ab62-4715-4f6e-9250-374ba1fbc981" />
 
 ## 3. Detailed Node Descriptions
 
