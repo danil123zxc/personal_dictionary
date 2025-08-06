@@ -1,4 +1,4 @@
-<img width="186" height="623" alt="image" src="https://github.com/user-attachments/assets/917e43d8-0c07-4b2f-a812-0289bc33d76e" /># Technical Writeup: Offline AI Language Learning Application Using Gemma 3n and LangGraph
+# Technical Writeup: Offline AI Language Learning Application Using Gemma 3n and LangGraph
 
 ## 1. Introduction
 
