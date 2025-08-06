@@ -1,0 +1,325 @@
+{
+    "('English', '한국어')": {
+        "on": {
+            "translations": {
+                "translations": [
+                    "위에"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "with": {
+            "translations": {
+                "translations": [
+                    "와 함께"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "cream": {
+            "translations": {
+                "translations": [
+                    "크림"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "some": {
+            "translations": {
+                "translations": [
+                    "몇몇"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "sun": {
+            "translations": {
+                "translations": [
+                    "태양"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "bench": {
+            "translations": {
+                "translations": [
+                    "벤치"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "to": {
+            "translations": {
+                "translations": [
+                    "에"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "my": {
+            "translations": {
+                "translations": [
+                    "나의"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "ducks": {
+            "translations": {
+                "translations": [
+                    "오리"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "I": {
+            "translations": {
+                "translations": [
+                    "나"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "we": {
+            "translations": {
+                "translations": [
+                    "우리"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "day": {
+            "translations": {
+                "translations": [
+                    "날"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "birds": {
+            "translations": {
+                "translations": [
+                    "새"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "ate": {
+            "translations": {
+                "translations": [
+                    "먹다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "after": {
+            "translations": {
+                "translations": [
+                    "후에"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "a": {
+            "translations": {
+                "translations": [
+                    "하나의"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "it": {
+            "translations": {
+                "translations": [
+                    "그것"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "that": {
+            "translations": {
+                "translations": [
+                    "그것"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "shining": {
+            "translations": {
+                "translations": [
+                    "빛나는"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "along": {
+            "translations": {
+                "translations": [
+                    "따라"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "singing": {
+            "translations": {
+                "translations": [
+                    "노래하다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "walked": {
+            "translations": {
+                "translations": [
+                    "걷다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "river": {
+            "translations": {
+                "translations": [
+                    "강"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "sat": {
+            "translations": {
+                "translations": [
+                    "앉다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "was": {
+            "translations": {
+                "translations": [
+                    "이다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "and": {
+            "translations": {
+                "translations": [
+                    "그리고"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "went": {
+            "translations": {
+                "translations": [
+                    "가다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "ice": {
+            "translations": {
+                "translations": [
+                    "얼음"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "perfect": {
+            "translations": {
+                "translations": [
+                    "완벽한"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "yesterday": {
+            "translations": {
+                "translations": [
+                    "어제"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "the": {
+            "translations": {
+                "translations": [
+                    "그"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "park": {
+            "translations": {
+                "translations": [
+                    "공원"
+                ]
+            },
+            "definitions": [
+                "A place of no significance or value.",
+                "A place of no particular significance or activity."
+            ],
+            "examples": [
+                "This park is a place of no significance or value.",
+                "The park is just an empty space with nothing much to do."
+            ]
+        },
+        "friend": {
+            "translations": {
+                "translations": [
+                    "친구"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "saw": {
+            "translations": {
+                "translations": [
+                    "보다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        },
+        "were": {
+            "translations": {
+                "translations": [
+                    "이다"
+                ]
+            },
+            "definitions": [],
+            "examples": []
+        }
+    }
+}
