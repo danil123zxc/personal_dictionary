@@ -24,7 +24,7 @@ class User(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
-    full_name = Column(String, nullable=True)
+    full_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -35,10 +35,6 @@ class User(Base, TimestampMixin):
     words = relationship("Word", back_populates="user")  
 
     # Validation
-    @validates('email')
-    def validate_email(self, key, address):
-        assert '@' in address, "Invalid email format"
-        return address
     
     @validates('username')
     def validate_username(self, key, username):
