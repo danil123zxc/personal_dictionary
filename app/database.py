@@ -1,9 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+import os
 
-URL_DATABASE = "postgresql://postgres:800855@localhost:5432/dictionary"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(URL_DATABASE, echo=True, future=True)
+engine = create_engine(DATABASE_URL, echo=True, future=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

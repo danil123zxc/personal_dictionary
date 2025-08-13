@@ -8,4 +8,7 @@ chromadb
 fastapi>=0.103.0
 sqlalchemy>=2.0.42
 alembic>=1.16.4
-uvicorn
+uvicorn>=0.35.0
+psycopg2-binary>=2.9.10
+pydantic[email]
+passlib>=1.7.4

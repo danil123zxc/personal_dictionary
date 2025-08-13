@@ -25,3 +25,6 @@ alembic/versions/__pycache__/
 
 # Logs
 *.log
+
+# Database password
+.env
