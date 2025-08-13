@@ -1,12 +1,8 @@
 from langchain_ollama import ChatOllama
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers.json import JsonOutputParser
-from pydantic import BaseModel, Field, RootModel
-from typing import List, Optional, Dict, Any
-import json
-from langchain_community.document_loaders import JSONLoader
-from langchain_text_splitters.character import RecursiveCharacterTextSplitter
-from prompts import *
+from schemas import TranslationResponse, DefinitionResponse, ExamplesResponse
+from typing import Optional
 
 llm = ChatOllama( 
     model="gemma3n",
@@ -38,17 +34,6 @@ codes_language = {
     "pt":"Português"
 }
 
-
-class TranslationResponse(RootModel[Dict[str, List[str]]]):
-    "Dictionary where keys are words (lemmas) and values are translations"
-    pass
- 
-class DefinitionResponse(BaseModel):
-    definition: List[str] = Field(description="List of definition in the target language")
-
-class ExamplesResponse(BaseModel):
-    examples: List[str] = Field(description="List of usage examples in the target language")
-    
 def generate_translation(text: str, src_language: str, tgt_language: str) -> dict:
     """
     Generate translations in a given text from the source language to the target language.

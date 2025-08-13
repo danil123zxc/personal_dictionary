@@ -94,7 +94,8 @@ class Word(Base, TimestampMixin):
     lemma = Column(String, index=True, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  
-    
+    original_text_id = Column(Integer, ForeignKey('texts.id')) 
+   
     language = relationship("Language", back_populates="words")
     user = relationship("User", back_populates="words")
     
@@ -102,6 +103,7 @@ class Word(Base, TimestampMixin):
     definitions = relationship("Definition", back_populates="word")
     examples = relationship("Example", back_populates="word")
     word_progress = relationship("UserWordProgress", back_populates="word")
+    original_text = relationship("Text", back_populates="definitions")
 
     translations = relationship(
         "Word",
@@ -123,10 +125,11 @@ class Definition(Base, TimestampMixin):
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
     word_id = Column(Integer, ForeignKey('words.id'), nullable=False)
     definition_text = Column(Text, nullable=False)
-    source = Column(String, nullable=True) 
+    original_text_id = Column(Integer, ForeignKey('texts.id')) 
     
     language = relationship("Language", back_populates="definitions")
     word = relationship("Word", back_populates="definitions")
+    original_text = relationship("Text", back_populates="definitions")
 
 class Example(Base, TimestampMixin):
     __tablename__ = 'examples'
@@ -141,6 +144,7 @@ class Example(Base, TimestampMixin):
     word = relationship("Word", back_populates="examples")
 
 class UserWordProgress(Base, TimestampMixin):
+
     __tablename__ = 'user_word_progress'
     
     id = Column(Integer, primary_key=True, index=True)
@@ -152,3 +156,15 @@ class UserWordProgress(Base, TimestampMixin):
     
     user = relationship("User", back_populates="word_progress")
     word = relationship("Word", back_populates="word_progress")
+
+class Text(Base, TimestampMixin):
+
+    __tablename__ = 'texts'
+
+    id = Column(Integer, primary_key=True, index=True)
+    text = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'text', name='uq_user_text'),
+    )
