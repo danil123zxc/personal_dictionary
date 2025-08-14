@@ -3,6 +3,17 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers.json import JsonOutputParser
 from schemas import TranslationResponse, DefinitionResponse, ExamplesResponse
 from typing import Optional
+import os
+from dotenv import load_dotenv
+from langsmith import traceable
+from pathlib import Path
+
+# Get the root directory (parent of app directory)
+root_dir = Path(__file__).parent.parent
+env_path = root_dir / '.env'
+
+# Load the .env file from root directory
+load_dotenv(dotenv_path=env_path)
 
 llm = ChatOllama( 
     model="gemma3n",
