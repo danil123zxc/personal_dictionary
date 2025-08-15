@@ -1,6 +1,7 @@
 from sqlalchemy import (
     Boolean, Column, Integer, String, Text, ForeignKey, CHAR, Table, DateTime, func, CheckConstraint, UniqueConstraint
 )
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship, validates
 from app.database import Base
 
@@ -13,6 +14,14 @@ word_translations = Table(
     CheckConstraint('word_id != translation_id', name='no_self_translation'),
     UniqueConstraint('word_id', 'translation_id', name='unique_translation_pair')
 )
+
+EMB_DIM = 384
+class EmbeddingMixin:
+    # vector column; nullable=True so you can backfill later
+    embedding = Column(Vector(EMB_DIM), nullable=True)
+    # optional metadata about your embedding
+    embedding_model = Column(String(64), nullable=True)
+    embedding_updated_at = Column(DateTime(timezone=True), nullable=True)
 
 # Timestamp mixin
 class TimestampMixin:
@@ -90,7 +99,7 @@ class Dictionary(Base, TimestampMixin):
     original_text = relationship("Text", back_populates="dictionaries")
 
 # Word
-class Word(Base, TimestampMixin):
+class Word(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'words'
     
     id = Column(Integer, primary_key=True, index=True)
@@ -100,6 +109,8 @@ class Word(Base, TimestampMixin):
     language = relationship("Language", back_populates="words")
     dictionaries = relationship("Dictionary", back_populates="word")
     user_word_progress = relationship("UserWordProgress", back_populates="word")
+
+
 
     translations = relationship(
         "Word",
@@ -117,7 +128,7 @@ class Word(Base, TimestampMixin):
     )
 
 # Definition
-class Definition(Base, TimestampMixin):
+class Definition(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'definitions'
     
     id = Column(Integer, primary_key=True, index=True)
@@ -131,7 +142,7 @@ class Definition(Base, TimestampMixin):
     original_text = relationship("Text", back_populates="definitions")
 
 # Example
-class Example(Base, TimestampMixin):
+class Example(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'examples'
     
     id = Column(Integer, primary_key=True, index=True)
@@ -157,7 +168,7 @@ class UserWordProgress(Base, TimestampMixin):
     word = relationship("Word", back_populates="user_word_progress")
 
 # Text
-class Text(Base, TimestampMixin):
+class Text(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'texts'
 
     id = Column(Integer, primary_key=True, index=True)
