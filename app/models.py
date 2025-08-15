@@ -5,16 +5,6 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship, validates
 from app.database import Base
 
-# Association table
-word_translations = Table(
-    'word_translations',
-    Base.metadata,
-    Column('word_id', Integer, ForeignKey('words.id', ondelete='CASCADE'), primary_key=True),
-    Column('translation_id', Integer, ForeignKey('words.id', ondelete='CASCADE'), primary_key=True),
-    CheckConstraint('word_id != translation_id', name='no_self_translation'),
-    UniqueConstraint('word_id', 'translation_id', name='unique_translation_pair')
-)
-
 EMB_DIM = 384
 class EmbeddingMixin:
     # vector column; nullable=True so you can backfill later
@@ -106,26 +96,19 @@ class Word(Base, TimestampMixin, EmbeddingMixin):
     lemma = Column(String, index=True, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
 
-    language = relationship("Language", back_populates="words")
-    dictionaries = relationship("Dictionary", back_populates="word")
+    language = relationship("Language", back_populates="word")
+    dictionary = relationship("Dictionary", back_populates="word")
     user_word_progress = relationship("UserWordProgress", back_populates="word")
 
+class Translation(Base, TimestampMixin, EmbeddingMixin):
+    __tablename__ = 'translations'
 
+    id = Column(Integer, primary_key=True, index=True)
+    translation = Column(String, index=True, nullable=False)
+    language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
 
-    translations = relationship(
-        "Word",
-        secondary=word_translations,
-        primaryjoin=id == word_translations.c.word_id,
-        secondaryjoin=id == word_translations.c.translation_id,
-        back_populates="translated_from"
-    )
-    translated_from = relationship(
-        "Word",
-        secondary=word_translations,
-        primaryjoin=id == word_translations.c.translation_id,
-        secondaryjoin=id == word_translations.c.word_id,
-        back_populates="translations"
-    )
+    language = relationship("Language", back_populates="translation")
+    dictionary= relationship("Dictionary", back_populates="translation")
 
 # Definition
 class Definition(Base, TimestampMixin, EmbeddingMixin):

@@ -1,6 +1,6 @@
 version: "3.9"
 
-services:
+services: 
   server:
     container_name: server
     build:
@@ -12,6 +12,9 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/dictionary
+      - LANGCHAIN_TRACING_V2=${LANGSMITH_TRACING}
+      - LANGCHAIN_ENDPOINT=${LANGSMITH_ENDPOINT}
+      - LANGCHAIN_API_KEY=${LANGSMITH_API_KEY}
     env_file:
       - .env
     volumes:
@@ -24,7 +27,7 @@ services:
 
   db:
     container_name: db
-    image: postgres:16
+    image: pgvector/pgvector:pg16  
     restart: always
     environment:
       - POSTGRES_DB=dictionary
@@ -32,6 +35,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d 
     ports:
       - "5432:5432"
     healthcheck:
