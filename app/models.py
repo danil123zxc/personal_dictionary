@@ -39,22 +39,57 @@ class User(Base, TimestampMixin):
 # Language
 class Language(Base, TimestampMixin):
     __tablename__ = 'languages'
-    
     id = Column(Integer, primary_key=True, index=True)
     code = Column(CHAR(5), unique=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
-    
-    learning_profiles_primary = relationship("LearningProfile", back_populates="primary_language", foreign_keys="LearningProfile.primary_language_id")
-    learning_profiles_foreign = relationship("LearningProfile", back_populates="foreign_language", foreign_keys="LearningProfile.foreign_language_id")
-    
+
+    learning_profiles_primary = relationship(
+        "LearningProfile", back_populates="primary_language",
+        foreign_keys="LearningProfile.primary_language_id"
+    )
+    learning_profiles_foreign = relationship(
+        "LearningProfile", back_populates="foreign_language",
+        foreign_keys="LearningProfile.foreign_language_id"
+    )
+
+    # Prefer plural; collection on this side
+    translations = relationship("Translation", back_populates="language")
     words = relationship("Word", back_populates="language")
     definitions = relationship("Definition", back_populates="language")
     examples = relationship("Example", back_populates="language")
 
+
+# Word
+class Word(Base, TimestampMixin, EmbeddingMixin):
+    __tablename__ = 'words'
+    id = Column(Integer, primary_key=True, index=True)
+    lemma = Column(String, index=True, nullable=False)
+    language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
+
+    language = relationship("Language", back_populates="words")         # ✅ fix
+    dictionaries = relationship("Dictionary", back_populates="word")    # ✅ prefer plural
+    user_word_progress = relationship("UserWordProgress", back_populates="word")
+
+class UserWordProgress(Base, TimestampMixin):
+    __tablename__ = 'user_word_progress'
+
+    id = Column(Integer, primary_key=True, index=True)
+    learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
+    word_id = Column(Integer, ForeignKey('words.id'), nullable=False)
+    proficiency = Column(Integer, default=0)
+    last_reviewed = Column(DateTime(timezone=True), nullable=True)
+    next_review_due = Column(DateTime(timezone=True), nullable=True)
+
+    learning_profile = relationship("LearningProfile", back_populates="word_progress")
+    word = relationship("Word", back_populates="user_word_progress")
+
+    __table_args__ = (
+        UniqueConstraint('learning_profile_id', 'word_id', name='uq_lprof_word'),
+    )
+    
 # LearningProfile
 class LearningProfile(Base, TimestampMixin):
     __tablename__ = 'learning_profiles'
-    
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     primary_language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
@@ -68,52 +103,43 @@ class LearningProfile(Base, TimestampMixin):
     word_progress = relationship("UserWordProgress", back_populates="learning_profile")
     texts = relationship("Text", back_populates="learning_profile")
 
-    __table_args__ = (
-        CheckConstraint('primary_language_id != foreign_language_id', name='different_languages'),
-    )
+    __table_args__ = (CheckConstraint('primary_language_id != foreign_language_id', name='different_languages'),)
+
 
 # Dictionary
 class Dictionary(Base, TimestampMixin):
     __tablename__ = 'dictionaries'
-    
     id = Column(Integer, primary_key=True, index=True)
     learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
     word_id = Column(Integer, ForeignKey('words.id'), nullable=False)
     notes = Column(Text, nullable=True)
     original_text_id = Column(Integer, ForeignKey('texts.id'))
 
-    learning_profile = relationship("LearningProfile", back_populates="dictionaries")
-    word = relationship("Word", back_populates="dictionaries")
+    learning_profile = relationship("LearningProfile", back_populates="dictionaries")  # ✅ fix
+    word = relationship("Word", back_populates="dictionaries")                         # ✅ match Word.dictionaries
     definitions = relationship("Definition", back_populates="dictionary")
     examples = relationship("Example", back_populates="dictionary")
-    original_text = relationship("Text", back_populates="dictionaries")
+    original_text = relationship("Text", back_populates="dictionaries")                # ✅ fix
+    translations = relationship("Translation", back_populates="dictionary")            # ✅ if you add FK below
 
-# Word
-class Word(Base, TimestampMixin, EmbeddingMixin):
-    __tablename__ = 'words'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    lemma = Column(String, index=True, nullable=False)
-    language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
 
-    language = relationship("Language", back_populates="word")
-    dictionary = relationship("Dictionary", back_populates="word")
-    user_word_progress = relationship("UserWordProgress", back_populates="word")
-
+# Translation  (add dictionary_id if you want this relation)
 class Translation(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'translations'
-
     id = Column(Integer, primary_key=True, index=True)
     translation = Column(String, index=True, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
 
-    language = relationship("Language", back_populates="translation")
-    dictionary= relationship("Dictionary", back_populates="translation")
+    # Add this if Translation belongs to a Dictionary entry:
+    dictionary_id = Column(Integer, ForeignKey('dictionaries.id'), nullable=False)     # ✅ add FK
 
-# Definition
+    language = relationship("Language", back_populates="translations")                 # ✅ plural on Language
+    dictionary = relationship("Dictionary", back_populates="translations")             # ✅ matches Dictionary.translations
+
+
+# Definition (unchanged)
 class Definition(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'definitions'
-    
     id = Column(Integer, primary_key=True, index=True)
     definition_text = Column(Text, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
@@ -124,36 +150,22 @@ class Definition(Base, TimestampMixin, EmbeddingMixin):
     dictionary = relationship("Dictionary", back_populates="definitions")
     original_text = relationship("Text", back_populates="definitions")
 
-# Example
+
+# Example (unchanged)
 class Example(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'examples'
-    
     id = Column(Integer, primary_key=True, index=True)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
     dictionary_id = Column(Integer, ForeignKey('dictionaries.id'), nullable=False)
     example_text = Column(Text, nullable=False)
-    
+
     language = relationship("Language", back_populates="examples")
     dictionary = relationship("Dictionary", back_populates="examples")
 
-# UserWordProgress
-class UserWordProgress(Base, TimestampMixin):
-    __tablename__ = 'user_word_progress'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
-    word_id = Column(Integer, ForeignKey('words.id'), nullable=False)
-    proficiency = Column(Integer, default=0)
-    last_reviewed = Column(DateTime(timezone=True), nullable=True)
-    next_review_due = Column(DateTime(timezone=True), nullable=True)
-    
-    learning_profile = relationship("LearningProfile", back_populates="word_progress")
-    word = relationship("Word", back_populates="user_word_progress")
 
 # Text
 class Text(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'texts'
-
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=False)
     learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
@@ -162,6 +174,4 @@ class Text(Base, TimestampMixin, EmbeddingMixin):
     dictionaries = relationship("Dictionary", back_populates="original_text")
     definitions = relationship("Definition", back_populates="original_text")
 
-    __table_args__ = (
-        UniqueConstraint('learning_profile_id', 'text', name='uq_user_text'),
-    )
+    __table_args__ = (UniqueConstraint('learning_profile_id', 'text', name='uq_user_text'),)

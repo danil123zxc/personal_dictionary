@@ -4,7 +4,7 @@ from app.prompts import *
 from fastapi import FastAPI, HTTPException, Query, Body, Depends
 from app.generate import generate_translation, generate_definition, generate_examples, language_codes, codes_language, llm
 from app.database import Base, engine, get_db
-from app.models import User as Userdb, Language as Languagedb, Word as Worddb, Definition as Definitiondb, Example as Exampledb, LearningProfile as LearningProfiledb
+from app.models import *
 from app.schemas import TranslationRead, ExamplesRead, DefinitionRead, TranslationResponse, UserCreate, UserRead, LanguageBase, LanguageRead, TranslationInput, ExamplesInput, DefinitionInput
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
@@ -19,15 +19,15 @@ db_dependency = Annotated[Session, Depends(get_db)]
 @app.post("/register", response_model=UserRead)
 def register_user(user: UserCreate, db: db_dependency):
     #Checking if user with the same username of email already exists
-    existing_user = db.query(Userdb).filter(
-        (Userdb.username == user.username) |
-        (Userdb.email == user.email)
+    existing_user = db.query(User).filter(
+        (User.username == user.username) |
+        (User.email == user.email)
     ).first()
 
     if existing_user:
         raise HTTPException(status_code=400, detail="Username or email already registered")
     #Adding user to the db
-    db_user = Userdb(username=user.username, full_name=user.full_name, email=user.email, password=pwd_context.hash(user.password))
+    db_user = User(username=user.username, full_name=user.full_name, email=user.email, password=pwd_context.hash(user.password))
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -37,12 +37,12 @@ def register_user(user: UserCreate, db: db_dependency):
 def get_user_info(db: db_dependency, user_id: Optional[int]=None, username: Optional[str]=None):
     
     if user_id and username:
-        user = db.query(Userdb).filter((Userdb.username == username) &
-                                       (Userdb.id == user_id)).first()
+        user = db.query(User).filter((User.username == username) &
+                                       (User.id == user_id)).first()
     elif user_id:
-        user = db.query(Userdb).filter(Userdb.id == user_id).first()
+        user = db.query(User).filter(User.id == user_id).first()
     elif username:
-        user = db.query(Userdb).filter(Userdb.username == username).first()
+        user = db.query(User).filter(User.username == username).first()
 
 
     if not user:
@@ -57,15 +57,15 @@ def create_language(language: LanguageBase, db: db_dependency):
     if not code:
         raise HTTPException(status_code=400, detail="Invalid language")
     
-    existing_language = db.query(Languagedb).filter(
-        (Languagedb.name == language.name) |
-        (Languagedb.code == code)
+    existing_language = db.query(Language).filter(
+        (Language.name == language.name) |
+        (Language.code == code)
     ).first()
 
     if existing_language:
         raise HTTPException(status_code=400, detail="Language already exists")
     
-    db_language = Languagedb(name=language.name, code=code)
+    db_language = Language(name=language.name, code=code)
     db.add(db_language)
     db.commit()
     db.refresh(db_language)
