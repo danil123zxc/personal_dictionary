@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, Query, Body, Depends
 from app.generate import generate_translation, generate_definition, generate_examples, language_codes, codes_language, llm
 from app.database import Base, engine, get_db
 from app.models import User as Userdb, Language as Languagedb, Word as Worddb, Definition as Definitiondb, Example as Exampledb, LearningProfile as LearningProfiledb
-from app.schemas import ExamplesBase, TranslationBase, ExamplesResponse, DefinitionResponse, TranslationResponse, UserCreate, UserRead, LanguageBase, LanguageRead, DefinitionBase, TranslationBase
+from app.schemas import TranslationRead, ExamplesRead, DefinitionRead, TranslationResponse, UserCreate, UserRead, LanguageBase, LanguageRead, TranslationInput, ExamplesInput, DefinitionInput
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
@@ -71,17 +71,21 @@ def create_language(language: LanguageBase, db: db_dependency):
     db.refresh(db_language)
     return db_language
 
-@app.post("/translate", response_model=TranslationResponse)
-def translate_text(text: TranslationBase):
+@app.post("/translate", response_model=TranslationRead)
+def translate_text(text: TranslationInput):
     return generate_translation(text.text, text.src_language, text.tgt_language)
 
-@app.post("/definition", response_model=DefinitionResponse)
-def definitions(text: DefinitionBase):
+@app.post("/definition", response_model=DefinitionRead)
+def definitions(text: DefinitionInput):
     return generate_definition(text.word, text.language, text.context)
 
-@app.post("/examples", response_model=ExamplesResponse)
-def examples(text: ExamplesBase):
-    return generate_examples(text.word, text.language, text.examples_number, text.definition)
+@app.post("/examples", response_model=ExamplesRead)
+def examples(text: ExamplesInput):
+    try:
+        return generate_examples(text.word, text.language, text.examples_number, text.definition)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating examples: {str(e)}")
+
 
 def main():
     # Example usage

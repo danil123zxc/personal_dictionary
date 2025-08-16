@@ -1,12 +1,13 @@
 from langchain_ollama import ChatOllama
 from langchain.prompts import ChatPromptTemplate
-from app.schemas import TranslationResponse, DefinitionResponse, ExamplesResponse
+from app.schemas import TranslationResponse, DefinitionResponse, ExamplesResponse, DefinitionRead, ExamplesRead, TranslationRead
 from typing import Optional
 from dotenv import load_dotenv
 from langsmith import traceable
 from pathlib import Path
 from app.prompts import translation_prompt, definition_prompt, example_prompt
 from typing import List
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Get the root directory (parent of app directory)
 root_dir = Path(__file__).parent.parent
@@ -84,7 +85,8 @@ def generate_translation(text: str, src_language: str, tgt_language: str) -> dic
     structured_llm = llm.with_structured_output(TranslationResponse)
     # Use the LLM to generate the translation
     response = structured_llm.invoke(messages)
-    return response.model_dump()
+    structured_output = TranslationRead(words=response, text=text, src_language=src_language, tgt_language=tgt_language)
+    return structured_output
 
 @traceable('definitions')
 def generate_definition(word: str, language: str,  context: Optional[str]=None) -> dict:
@@ -117,7 +119,8 @@ def generate_definition(word: str, language: str,  context: Optional[str]=None) 
     structured_llm = llm.with_structured_output(DefinitionResponse)
     # Use the llm to invoke the prompt and get the response
     response = structured_llm.invoke(messages)
-    return response.model_dump()
+    structured_output = DefinitionRead(definition=response.definition, word=word, language=language, context=context)
+    return structured_output.model_dump()
 
 @traceable(name='examples')
 def generate_examples(word: str, language: str, examples_number: int = 1, definition: Optional[str] = None) -> dict:
@@ -137,7 +140,7 @@ def generate_examples(word: str, language: str, examples_number: int = 1, defini
     """
     # Create an example prompt using ChatPromptTemplate
     prompt = ChatPromptTemplate.from_messages([
-        ('system', 'example_prompt'), 
+        ('system', example_prompt), 
         ('human', 'Definition: {definition}, Word: {word}')
     ])
     # Format the prompt with the provided variables
@@ -148,7 +151,9 @@ def generate_examples(word: str, language: str, examples_number: int = 1, defini
     # Use the llm to invoke the prompt and get the response
     structured_llm = llm.with_structured_output(ExamplesResponse)
     response = structured_llm.invoke(messages)
-    return response.model_dump()
+
+    return ExamplesRead(examples=response.examples, word=word, language=language, examples_number=examples_number, definition=definition)
+
 
 def get_similar_words_rag(word: str, text: str, k: int = 5) -> List[str]:
     """

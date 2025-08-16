@@ -2,6 +2,10 @@ from pydantic import Field, BaseModel, EmailStr, field_validator, ValidationInfo
 from typing import List, Optional, Dict, Any, Optional, Set, TypedDict
 
 
+class WordBase(BaseModel):
+    word: str
+    language: str
+
 class TranslationResponse(RootModel[Dict[str, List[str]]]):
     "Dictionary where keys are words (lemmas) and values are translations"
     pass
@@ -51,24 +55,26 @@ class LanguageRead(LanguageBase):
     class Config:
         orm_mode = True
 
-class TranslationBase(BaseModel):
+class TranslationInput(BaseModel):
     text: str
     src_language: str
     tgt_language: str
 
-class DefinitionBase(BaseModel):
-    word: str
-    language: str
+class DefinitionInput(WordBase):
     context: Optional[str]=None
 
-class ExamplesBase(BaseModel):
-    word: str
-    language: str
+class ExamplesInput(WordBase):
     examples_number: int=1
     definition: Optional[str]=None
 
-class TranslationRead(TranslationBase):
+class TranslationRead(TranslationInput):
     words: TranslationResponse
+
+class DefinitionRead(DefinitionInput, DefinitionResponse):
+    pass
+
+class ExamplesRead(ExamplesInput, ExamplesResponse):
+    pass
 
 class State(TypedDict):
     text: str  
