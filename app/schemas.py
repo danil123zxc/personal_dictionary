@@ -15,45 +15,6 @@ class DefinitionResponse(BaseModel):
 
 class ExamplesResponse(BaseModel):
     examples: List[str] = Field(description="List of usage examples in the target language")
-    
-class UserBase(BaseModel):
-    username: str
-    email: EmailStr
-    full_name: str
-
-class UserCreate(UserBase):
-    password: str
-    confirm_password: str
-    
-    @field_validator('confirm_password')
-    def passwords_match(cls, v: str, *, info: Optional[ValidationInfo] = None):
-        if info:
-            password = info.data.get('password')
-
-            if password != v:
-                raise ValueError("Passwords do not match")
-            
-        if not v or len(v) < 8:
-            raise ValueError("Length of your password must be at least 8 characters")
-    
-        return v
-    
-class UserRead(UserBase):
-    id: int
-
-    class Config:
-        orm_mode = True
-
-class LanguageBase(BaseModel):
-    name: str
-
-class LanguageRead(LanguageBase):
-
-    id: int
-    code: str
-
-    class Config:
-        orm_mode = True
 
 class TranslationInput(BaseModel):
     text: str
@@ -64,7 +25,7 @@ class DefinitionInput(WordBase):
     context: Optional[str]=None
 
 class ExamplesInput(WordBase):
-    examples_number: int=1
+    examples_number: Optional[int]=1
     definition: Optional[str]=None
 
 class TranslationRead(TranslationInput):
@@ -74,6 +35,9 @@ class DefinitionRead(DefinitionInput, DefinitionResponse):
     pass
 
 class ExamplesRead(ExamplesInput, ExamplesResponse):
+    pass
+
+class AllRead(TranslationInput, DefinitionRead, ExamplesRead):
     pass
 
 class State(TypedDict):

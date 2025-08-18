@@ -66,8 +66,8 @@ class Word(Base, TimestampMixin, EmbeddingMixin):
     lemma = Column(String, index=True, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
 
-    language = relationship("Language", back_populates="words")         # ✅ fix
-    dictionaries = relationship("Dictionary", back_populates="word")    # ✅ prefer plural
+    language = relationship("Language", back_populates="words")         
+    dictionaries = relationship("Dictionary", back_populates="word")    
     user_word_progress = relationship("UserWordProgress", back_populates="word")
 
 class UserWordProgress(Base, TimestampMixin):
@@ -115,12 +115,12 @@ class Dictionary(Base, TimestampMixin):
     notes = Column(Text, nullable=True)
     original_text_id = Column(Integer, ForeignKey('texts.id'))
 
-    learning_profile = relationship("LearningProfile", back_populates="dictionaries")  # ✅ fix
-    word = relationship("Word", back_populates="dictionaries")                         # ✅ match Word.dictionaries
+    learning_profile = relationship("LearningProfile", back_populates="dictionaries")  
+    word = relationship("Word", back_populates="dictionaries")                         
     definitions = relationship("Definition", back_populates="dictionary")
     examples = relationship("Example", back_populates="dictionary")
-    original_text = relationship("Text", back_populates="dictionaries")                # ✅ fix
-    translations = relationship("Translation", back_populates="dictionary")            # ✅ if you add FK below
+    original_text = relationship("Text", back_populates="dictionaries")                
+    translations = relationship("Translation", back_populates="dictionary")           
 
 
 # Translation  (add dictionary_id if you want this relation)
@@ -131,10 +131,10 @@ class Translation(Base, TimestampMixin, EmbeddingMixin):
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
 
     # Add this if Translation belongs to a Dictionary entry:
-    dictionary_id = Column(Integer, ForeignKey('dictionaries.id'), nullable=False)     # ✅ add FK
+    dictionary_id = Column(Integer, ForeignKey('dictionaries.id'), nullable=False)     
 
-    language = relationship("Language", back_populates="translations")                 # ✅ plural on Language
-    dictionary = relationship("Dictionary", back_populates="translations")             # ✅ matches Dictionary.translations
+    language = relationship("Language", back_populates="translations")                 
+    dictionary = relationship("Dictionary", back_populates="translations")            
 
 
 # Definition (unchanged)

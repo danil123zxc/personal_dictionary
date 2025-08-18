@@ -8,6 +8,7 @@ from pathlib import Path
 from app.prompts import translation_prompt, definition_prompt, example_prompt
 from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
+import os
 
 # Get the root directory (parent of app directory)
 root_dir = Path(__file__).parent.parent
@@ -18,6 +19,7 @@ load_dotenv(dotenv_path=env_path)
 
 llm = ChatOllama( 
     model="gemma3n",
+    base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
     temperature=0.5,
 )
 
@@ -68,7 +70,7 @@ def generate_translation(text: str, src_language: str, tgt_language: str) -> dic
                     'translations': [''],
                 }
             }}
- 
+
     """
     # Create a translation prompt using ChatPromptTemplate
     prompt = ChatPromptTemplate.from_messages([
@@ -155,64 +157,64 @@ def generate_examples(word: str, language: str, examples_number: int = 1, defini
     return ExamplesRead(examples=response.examples, word=word, language=language, examples_number=examples_number, definition=definition)
 
 
-def get_similar_words_rag(word: str, text: str, k: int = 5) -> List[str]:
-    """
-    Retrieve a list of words similar to the given input word using a RAG (Retrieval-Augmented Generation) retriever.
+# def get_similar_words_rag(word: str, text: str, k: int = 5) -> List[str]:
+#     """
+#     Retrieve a list of words similar to the given input word using a RAG (Retrieval-Augmented Generation) retriever.
 
-    This function queries a retriever object for documents related to the given `word` 
-    and then extracts similar words from the retrieved content. The retrieved documents 
-    are processed as either JSON (from which keys are extracted) or plain text.
+#     This function queries a retriever object for documents related to the given `word` 
+#     and then extracts similar words from the retrieved content. The retrieved documents 
+#     are processed as either JSON (from which keys are extracted) or plain text.
 
-    Args:
-        word (str):
-            The input word to search for.
-        text (str):
-            The reference text or corpus to be searched against.
-            (Currently unused in this implementation.)
-        k (int, optional):
-            The maximum number of retrieved results to process.
-            Defaults to 5.
+#     Args:
+#         word (str):
+#             The input word to search for.
+#         text (str):
+#             The reference text or corpus to be searched against.
+#             (Currently unused in this implementation.)
+#         k (int, optional):
+#             The maximum number of retrieved results to process.
+#             Defaults to 5.
 
-    Returns:
-        List[str]:
-            A list of similar words found in the retrieved documents.
-            Returns an empty list if retrieval fails or no valid data is found.
+#     Returns:
+#         List[str]:
+#             A list of similar words found in the retrieved documents.
+#             Returns an empty list if retrieval fails or no valid data is found.
 
-    Notes:
-        - Requires a global `retriever` object with an `.invoke()` method 
-          that returns either a list of documents or a single document.
-        - Each document must have a `.page_content` attribute.
-        - If `.page_content` is JSON, the keys are extracted as similar words.
-          If it's plain text, the content itself is added to the result.
-        - All retrieval and parsing errors are caugsht and logged to console.
+#     Notes:
+#         - Requires a global `retriever` object with an `.invoke()` method 
+#           that returns either a list of documents or a single document.
+#         - Each document must have a `.page_content` attribute.
+#         - If `.page_content` is JSON, the keys are extracted as similar words.
+#           If it's plain text, the content itself is added to the result.
+#         - All retrieval and parsing errors are caugsht and logged to console.
 
-    Example:
-        >>> get_similar_words_rag("apple", "", k=3)
-        ['fruit', 'macintosh', 'granny smith']
-    """
-    try:
-        # Query retriever for documents related to the input word
-        results = retriever.invoke(word)
+#     Example:
+#         >>> get_similar_words_rag("apple", "", k=3)
+#         ['fruit', 'macintosh', 'granny smith']
+#     """
+#     try:
+#         # Query retriever for documents related to the input word
+#         results = retriever.invoke(word)
 
-        # Ensure results is always a list for consistent iteration
-        if not isinstance(results, list):
-            results = [results]
+#         # Ensure results is always a list for consistent iteration
+#         if not isinstance(results, list):
+#             results = [results]
 
-        similar_words = []
+#         similar_words = []
 
-        # Process up to k retrieved documents
-        for doc in results[:k]:
-            try:
-                # Try to parse content as JSON and extract dictionary keys
-                data = json.loads(doc.page_content)
-                similar_words.extend(data.keys())
-            except json.JSONDecodeError:
-                # If parsing fails, treat content as plain text
-                similar_words.append(doc.page_content)
+#         # Process up to k retrieved documents
+#         for doc in results[:k]:
+#             try:
+#                 # Try to parse content as JSON and extract dictionary keys
+#                 data = json.loads(doc.page_content)
+#                 similar_words.extend(data.keys())
+#             except json.JSONDecodeError:
+#                 # If parsing fails, treat content as plain text
+#                 similar_words.append(doc.page_content)
 
-        return similar_words
+#         return similar_words
 
-    except Exception as e:
-        # Log the retrieval failure
-        print(f"[DEBUG] RAG search failed for '{word}': {e}")
-        return []
+#     except Exception as e:
+#         # Log the retrieval failure
+#         print(f"[DEBUG] RAG search failed for '{word}': {e}")
+#         return []

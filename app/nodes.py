@@ -1,6 +1,6 @@
 from app.generate import generate_translation, generate_definition, generate_examples, codes_language, language_codes
 from langgraph.graph import StateGraph, START, END
-from app.schemas import State
+from app.schemas import State, AllRead
 
 def translate_words_node(state: State) -> dict:
     """
@@ -32,7 +32,6 @@ def translate_words_node(state: State) -> dict:
         'words': words,
         'translations': translations
     }
-
 
 def generate_definitions_node(state: State) -> dict:
     """
@@ -102,3 +101,6 @@ def generate_examples_node(state: State) -> dict:
     return {
         'examples': examples
     }
+
+
+

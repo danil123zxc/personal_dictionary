@@ -14,3 +14,5 @@ pydantic[email]
 passlib>=1.7.4
 langsmith>=0.1.0
 pgvector>=0.4.1
+pyjwt>=2.10.1
+python-multipart>=0.0.20

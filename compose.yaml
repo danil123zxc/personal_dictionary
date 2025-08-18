@@ -5,14 +5,12 @@ services:
     restart: unless-stopped
     volumes:
       - ollama:/root/.ollama
-    command: ["ollama", "serve"] 
     healthcheck:
       test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 30s
-
   db:
     container_name: db
     image: pgvector/pgvector:pg16
@@ -42,12 +40,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/dictionary
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=gemma3n
+      - OLLAMA_MODEL=gemma3n  
       - LANGCHAIN_TRACING_V2=${LANGSMITH_TRACING}
       - LANGCHAIN_ENDPOINT=${LANGSMITH_ENDPOINT}
       - LANGCHAIN_API_KEY=${LANGSMITH_API_KEY}
