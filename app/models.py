@@ -27,7 +27,7 @@ class User(Base, TimestampMixin):
     password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    is_active = Column(Boolean, default=True)
+    disabled = Column(Boolean, default=False)
 
     learning_profiles = relationship("LearningProfile", back_populates="user")
 
@@ -74,13 +74,12 @@ class UserWordProgress(Base, TimestampMixin):
     __tablename__ = 'user_word_progress'
 
     id = Column(Integer, primary_key=True, index=True)
-    learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
     word_id = Column(Integer, ForeignKey('words.id'), nullable=False)
     proficiency = Column(Integer, default=0)
     last_reviewed = Column(DateTime(timezone=True), nullable=True)
     next_review_due = Column(DateTime(timezone=True), nullable=True)
+    learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'))
 
-    learning_profile = relationship("LearningProfile", back_populates="word_progress")
     word = relationship("Word", back_populates="user_word_progress")
 
     __table_args__ = (
@@ -100,8 +99,7 @@ class LearningProfile(Base, TimestampMixin):
     primary_language = relationship("Language", foreign_keys=[primary_language_id], back_populates="learning_profiles_primary")
     foreign_language = relationship("Language", foreign_keys=[foreign_language_id], back_populates="learning_profiles_foreign")
     dictionaries = relationship("Dictionary", back_populates="learning_profile")
-    word_progress = relationship("UserWordProgress", back_populates="learning_profile")
-    texts = relationship("Text", back_populates="learning_profile")
+    progress = relationship("UserWordProgress", back_populates="learning_profile")
 
     __table_args__ = (CheckConstraint('primary_language_id != foreign_language_id', name='different_languages'),)
 
@@ -113,7 +111,6 @@ class Dictionary(Base, TimestampMixin):
     learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
     word_id = Column(Integer, ForeignKey('words.id'), nullable=False)
     notes = Column(Text, nullable=True)
-    original_text_id = Column(Integer, ForeignKey('texts.id'))
 
     learning_profile = relationship("LearningProfile", back_populates="dictionaries")  
     word = relationship("Word", back_populates="dictionaries")                         
@@ -123,14 +120,12 @@ class Dictionary(Base, TimestampMixin):
     translations = relationship("Translation", back_populates="dictionary")           
 
 
-# Translation  (add dictionary_id if you want this relation)
+# Translation 
 class Translation(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'translations'
     id = Column(Integer, primary_key=True, index=True)
     translation = Column(String, index=True, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
-
-    # Add this if Translation belongs to a Dictionary entry:
     dictionary_id = Column(Integer, ForeignKey('dictionaries.id'), nullable=False)     
 
     language = relationship("Language", back_populates="translations")                 
@@ -169,6 +164,7 @@ class Text(Base, TimestampMixin, EmbeddingMixin):
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=False)
     learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
+    dictionary_id = Column(Integer, ForeignKey('dictionaries.id'))
 
     learning_profile = relationship("LearningProfile", back_populates="texts")
     dictionaries = relationship("Dictionary", back_populates="original_text")

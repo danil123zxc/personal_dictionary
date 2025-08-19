@@ -1,6 +1,7 @@
-from pydantic import Field, BaseModel, EmailStr, field_validator, ValidationInfo, RootModel
+from pydantic import ConfigDict, Field, BaseModel, EmailStr, field_validator, ValidationInfo, RootModel
 from typing import List, Optional, Dict, Any, Optional, Set, TypedDict
 
+#User
 class UserBase(BaseModel):
     username: str
     email: EmailStr
@@ -27,20 +28,93 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
+#Language
 class LanguageBase(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=64)
+    code: Optional[str] = Field(None, max_length=5)
+
 
 class LanguageRead(LanguageBase):
-
     id: int
-    code: str
+    
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
+#Word
+class WordBase(BaseModel):
+    lemma: str = Field(..., min_length=1, max_length=255)
+    language_id: int
 
+
+class WordRead(WordBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+#Learning profile
+class LearningProfileBase(BaseModel):
+    user_id: int
+    primary_language_id: int
+    foreign_language_id: int
+    is_active: Optional[bool] = True
+
+class LearningProfileRead(LearningProfileBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+#Dictionary
+class DictionaryBase(BaseModel):
+    learning_profile_id: int
+    word_id: int
+    notes: Optional[str] = None
+
+class DictionaryRead(DictionaryBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+#Translation
+class TranslationBase(BaseModel):
+    translation: str = Field(..., min_length=1)
+    language_id: int
+    dictionary_id: int
+
+
+class TranslationRead(TranslationBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+#Definition
+class DefinitionBase(BaseModel):
+    definition_text: str = Field(..., min_length=1)
+    language_id: int
+    dictionary_id: int
+    original_text_id: Optional[int] = None
+
+class DefinitionRead(DefinitionBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+#Examples
+class ExampleBase(BaseModel):
+    example_text: str = Field(..., min_length=1)
+    language_id: int
+    dictionary_id: int
+
+class ExampleRead(ExampleBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True) 
+#Text
+
+class TextBase(BaseModel):
+    learning_profile_id: int
+    text: str = Field(..., min_length=1)
+
+class TextRead(TextBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+#Token
 class Token(BaseModel):
     access_token: str
     token_type: str
