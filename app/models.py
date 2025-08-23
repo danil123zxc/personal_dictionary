@@ -27,13 +27,14 @@ class User(Base, TimestampMixin):
     password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    disabled = Column(Boolean, default=False)
+    disabled = Column(Boolean, default=False, nullable=False)
 
     learning_profiles = relationship("LearningProfile", back_populates="user")
 
     @validates('username')
     def validate_username(self, key, username):
-        assert len(username) >= 3, "Username must be at least 3 characters"
+        if not username or len(username) < 3:
+            raise ValueError("Username must be at least 3 characters")
         return username
 
 # Language
@@ -82,6 +83,8 @@ class UserWordProgress(Base, TimestampMixin):
 
     word = relationship("Word", back_populates="user_word_progress")
 
+    learning_profile = relationship("LearningProfile", back_populates="progress")
+
     __table_args__ = (
         UniqueConstraint('learning_profile_id', 'word_id', name='uq_lprof_word'),
     )
@@ -100,12 +103,14 @@ class LearningProfile(Base, TimestampMixin):
     foreign_language = relationship("Language", foreign_keys=[foreign_language_id], back_populates="learning_profiles_foreign")
     dictionaries = relationship("Dictionary", back_populates="learning_profile")
     progress = relationship("UserWordProgress", back_populates="learning_profile")
+    texts = relationship("Text", back_populates="learning_profile")
+
 
     __table_args__ = (CheckConstraint('primary_language_id != foreign_language_id', name='different_languages'),)
 
 
 # Dictionary
-class Dictionary(Base, TimestampMixin):
+class Dictionary(Base, TimestampMixin):     
     __tablename__ = 'dictionaries'
     id = Column(Integer, primary_key=True, index=True)
     learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
@@ -116,7 +121,7 @@ class Dictionary(Base, TimestampMixin):
     word = relationship("Word", back_populates="dictionaries")                         
     definitions = relationship("Definition", back_populates="dictionary")
     examples = relationship("Example", back_populates="dictionary")
-    original_text = relationship("Text", back_populates="dictionaries")                
+    texts = relationship("Text", back_populates="dictionary")                
     translations = relationship("Translation", back_populates="dictionary")           
 
 
@@ -139,11 +144,9 @@ class Definition(Base, TimestampMixin, EmbeddingMixin):
     definition_text = Column(Text, nullable=False)
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
     dictionary_id = Column(Integer, ForeignKey('dictionaries.id'), nullable=False)
-    original_text_id = Column(Integer, ForeignKey('texts.id'))
 
     language = relationship("Language", back_populates="definitions")
     dictionary = relationship("Dictionary", back_populates="definitions")
-    original_text = relationship("Text", back_populates="definitions")
 
 
 # Example (unchanged)
@@ -163,11 +166,10 @@ class Text(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'texts'
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=False)
-    learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'), nullable=False)
     dictionary_id = Column(Integer, ForeignKey('dictionaries.id'))
+    learning_profile_id = Column(Integer, ForeignKey('learning_profiles.id'))
 
     learning_profile = relationship("LearningProfile", back_populates="texts")
-    dictionaries = relationship("Dictionary", back_populates="original_text")
-    definitions = relationship("Definition", back_populates="original_text")
+    dictionary = relationship("Dictionary", back_populates="texts")
 
     __table_args__ = (UniqueConstraint('learning_profile_id', 'text', name='uq_user_text'),)

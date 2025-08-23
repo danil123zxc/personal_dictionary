@@ -1,29 +1,32 @@
-from pydantic import ConfigDict, Field, BaseModel, EmailStr, field_validator, ValidationInfo, RootModel
+from pydantic import ConfigDict, Field, BaseModel, EmailStr, ValidationInfo, RootModel, model_validator
 from typing import List, Optional, Dict, Any, Optional, Set, TypedDict
 
 #User
 class UserBase(BaseModel):
-    username: str
+    username: str = Field(min_length=3, max_length=50)
+    full_name: str = Field(min_length=1, max_length=100)
     email: EmailStr
-    full_name: str
     disabled: bool = False
+
+class UserUpdate(UserBase):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+    full_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    email: Optional[EmailStr] = None
+    disabled: Optional[bool] = None
+
+    model_config = ConfigDict(extra="forbid") # reject unknown keys
 
 class UserCreate(UserBase):
     password: str
     confirm_password: str
-    
-    @field_validator('confirm_password')
-    def passwords_match(cls, v: str, *, info: Optional[ValidationInfo] = None):
-        if info:
-            password = info.data.get('password')
 
-            if password != v:
-                raise ValueError("Passwords do not match")
-            
-        if not v or len(v) < 8:
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+        if len(self.password) < 8:
             raise ValueError("Length of your password must be at least 8 characters")
-    
-        return v
+        return self
         
 class UserRead(UserBase):
     id: int
@@ -107,6 +110,7 @@ class ExampleRead(ExampleBase):
 
 class TextBase(BaseModel):
     learning_profile_id: int
+    dictionary_id: int
     text: str = Field(..., min_length=1)
 
 class TextRead(TextBase):

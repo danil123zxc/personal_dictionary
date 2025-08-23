@@ -9,6 +9,7 @@ from app.prompts import translation_prompt, definition_prompt, example_prompt
 from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import os
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Get the root directory (parent of app directory)
 root_dir = Path(__file__).parent.parent
@@ -16,6 +17,7 @@ env_path = root_dir / '.env'
 
 # Load the .env file from root directory
 load_dotenv(dotenv_path=env_path)
+
 
 llm = ChatOllama( 
     model="gemma3n",
@@ -155,6 +157,19 @@ def generate_examples(word: str, language: str, examples_number: int = 1, defini
     response = structured_llm.invoke(messages)
 
     return ExamplesRead(examples=response.examples, word=word, language=language, examples_number=examples_number, definition=definition)
+
+
+EMBEDDINGS_MODEL_NAME = os.getenv("EMBEDDINGS_MODEL_NAME", "all-MiniLM-L6-v2")
+EMBEDDINGS_DEVICE = os.getenv("EMBEDDINGS_DEVICE", "cpu")
+
+@traceable(name='embed_word')
+def embed_single_word(word: str):
+    """
+    Takes single word and and returns 
+    """
+    if not word:
+        raise ValueError("Word must be a non-empty string")
+
 
 
 # def get_similar_words_rag(word: str, text: str, k: int = 5) -> List[str]:
