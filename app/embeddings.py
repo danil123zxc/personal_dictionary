@@ -1,7 +1,6 @@
 from typing import List, Dict
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_postgres import PGVector
 from langsmith import traceable
 from langchain_core.documents import Document
 from sqlalchemy.engine import Engine
@@ -25,39 +24,21 @@ _embeddings = HuggingFaceEmbeddings(
     encode_kwargs={"normalize_embeddings": True},  # ensures unit-length vectors
 )
 
-
-@traceable(name="embed_word")
-def embed_word(word: str) -> List[float]:
+@traceable(name="embed")
+def embed(text: str)-> List[Document]:
     """
-    Compute an embedding for a SINGLE word (or short phrase).
-
-    Args:
-        word:      Non-empty string to embed.
-
-    Returns:
-        Embedding vector as a list of floats.
+    Split text into chunks, embed each chunk, and return Documents
+    with embedding stored in metadata.
     """
-    w = (word or "").strip()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=220, chunk_overlap=30, add_start_index=True)
+    docs = text_splitter.create_documents([text])
+    chunks = [doc.page_content for doc in docs]
+    embs = _embeddings.embed_documents(chunks)
 
-    if not w:
-        raise ValueError("word must be a non-empty string")
+    for doc, emb in zip(docs, embs):
+        doc.metadata["embedding"] = emb  
+        doc.metadata["model"] = EMBEDDINGS_MODEL_NAME
+        start = doc.metadata["start_index"]
+        doc.metadata["end"] = start + len(doc.page_content)
 
-    vec = _embeddings.embed_query(w)  # List[float]
-
-    return vec
-
-@traceable(name="embed_text")
-def split_text(text: str, chunk_size: int = 500, chunk_overlap: int = 50):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-
-    texts = text_splitter.create_documents([text])
-    
-    return texts
-
-@traceable(name="embed_text")
-def embed_text(docs: Document, collection_name: str, connection: str | Engine):
-    vec_store = PGVector(embeddings=_embeddings,
-             collection_name=collection_name,
-             connection=connection,
-             use_jsonb=True)
-    vec_store.add_documents(docs)
+    return docs

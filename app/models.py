@@ -162,7 +162,7 @@ class Example(Base, TimestampMixin, EmbeddingMixin):
 
 
 # Text
-class Text(Base, TimestampMixin, EmbeddingMixin):
+class Text(Base, TimestampMixin):
     __tablename__ = 'texts'
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=False)
@@ -172,4 +172,43 @@ class Text(Base, TimestampMixin, EmbeddingMixin):
     learning_profile = relationship("LearningProfile", back_populates="texts")
     dictionary = relationship("Dictionary", back_populates="texts")
 
+    chunks = relationship(
+        "TextChunk",
+        back_populates="text",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="TextChunk.pos",
+    )
+
     __table_args__ = (UniqueConstraint('learning_profile_id', 'text', name='uq_user_text'),)
+
+#Text chumk
+class TextChunk(Base, TimestampMixin, EmbeddingMixin):
+    __tablename__ = "text_chunks"
+
+    id = Column(Integer, primary_key=True)
+    text_id = Column(
+        Integer,
+        ForeignKey("texts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # position of the chunk in the original sequence (0, 1, 2, …)
+    pos = Column(Integer, nullable=False)
+
+    # exact slice text
+    content = Column(Text, nullable=False)
+
+    start_char = Column(Integer, nullable=True)
+    end_char   = Column(Integer, nullable=True)
+
+    dictionary_id = Column(Integer, nullable=True, index=True)
+    learning_profile_id = Column(Integer, nullable=True, index=True)
+ 
+    text = relationship("Text", back_populates="chunks")
+
+    __table_args__ = (
+        # one chunk number per parent
+        UniqueConstraint("text_id", "pos", name="uq_textchunk_pos"),
+    )
