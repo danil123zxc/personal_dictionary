@@ -36,28 +36,11 @@ Powered by the **Gemma 3n** language model running locally via **Ollama**, this 
 - **[Ollama](https://ollama.ai/)** — Runs Gemma 3n locally for translations, definitions, and examples.
 - **Gemma 3n** — Multilingual, on-device LLM for fast and private language processing.
 - **LangGraph** — Modular, node-based pipeline execution.
-- **FAISS** — High-performance vector search for semantic similarity.
+- **Pgvector** — High-performance vector search for semantic similarity.
 - **MiniLM Embeddings** — Lightweight, accurate sentence embeddings for similarity search.
 - **Python** — Core programming language for app logic.
 
 ---
-```python
-test_state = {
-        'text':text_en, 
-        'src_language':'en',
-        'tgt_language':'ko',
-        'words':set(text_en.split()),
-        "translations": {'park': []},
-        "definitions": {'park': []},
-        "examples": {'park': []},
-        "examples_number": {'park': 1},
-        "similar_words": {'park': []},
-        "saved_to_json":False
-}
-
-compiled_graph.invoke(test_state)
-```
-## [Output](dictionary.json)
 
 ## 🔮Future Plans
 Spaced repetition system for optimized review.
