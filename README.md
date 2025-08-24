@@ -56,6 +56,6 @@ Ollama for running Gemma 3n locally.
 
 LangGraph for the pipeline architecture.
 
-FAISS for semantic similarity search.
+Pgvector for semantic similarity search.
 
 HuggingFace for MiniLM embeddings.
