@@ -1,3 +1,30 @@
+"""
+AI Prompts Module
+
+This module contains the prompt templates used by the AI language models
+for generating translations, definitions, and examples. These prompts are
+designed to work with structured output models to ensure consistent and
+reliable results.
+
+Features:
+- Translation prompts for extracting and translating content words
+- Definition prompts for generating word definitions
+- Example prompts for creating usage examples
+- Structured output formatting for consistent results
+
+Usage:
+    These prompts are used by the generate.py module with LangChain's
+    structured output capabilities to ensure the AI models return
+    data in the expected format.
+
+Prompt Design Principles:
+- Clear, specific instructions to avoid ambiguity
+- Structured output requirements for consistent parsing
+- Context-aware processing for better accuracy
+- Language-specific guidance for proper translations
+"""
+
+# Translation prompt for extracting and translating content words from text
 translation_prompt = """
     You receive a text.
 
@@ -11,6 +38,7 @@ translation_prompt = """
     Do not add extra explanations or context.
     """
 
+# Definition prompt for generating word definitions in specific languages
 definition_prompt = """
     Generate a single definition for the word in {language}, based only on its meaning in the given sentence:
 
@@ -22,6 +50,7 @@ definition_prompt = """
 
 """
 
+# Example prompt for generating usage examples for words
 example_prompt = """
     Generate {examples_number} simple sentences for the word in {language} using only the given definition:
     Rules:

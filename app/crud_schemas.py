@@ -1,5 +1,5 @@
 from pydantic import ConfigDict, Field, BaseModel, EmailStr, ValidationInfo, RootModel, model_validator
-from typing import List, Optional, Dict, Any, Optional, Set, TypedDict
+from typing import List, Optional, Dict, Any, Set, TypedDict
 
 #User
 class UserBase(BaseModel):
@@ -124,4 +124,4 @@ class Token(BaseModel):
     token_type: str
 
 class TokenData(BaseModel):
-    username: str
+    username: str | None = None
