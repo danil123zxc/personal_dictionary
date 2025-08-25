@@ -16,6 +16,7 @@ import os
 from app import auth
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
+from app.embeddings import embed
 
 app = FastAPI()
 
@@ -313,7 +314,7 @@ def create_word(
       - (lemma, language_id) pair must be unique.
     """
 
-    # 1) Validate language exists
+    # Validate language exists
     language = db.query(Language).filter(Language.id == word.language_id).first()
     if not language:
         raise HTTPException(
@@ -321,7 +322,7 @@ def create_word(
             detail="Language doesn't exist"
         )
 
-    # 2) Check duplicates
+    # Check duplicates
     exists = (
         db.query(Word)
         .filter(
@@ -335,9 +336,13 @@ def create_word(
             status_code=status.HTTP_409_CONFLICT,
             detail="Word already exists"
         )
+    # Create word's embedding 
+    embedding_doc = embed(word.lemma)
+    embedding = embedding_doc[0].page_content
+    embedding_model = embedding_doc[0].metadata.get('model')
 
-    # 3) Create new word
-    db_word = Word(lemma=word.lemma, language_id=language.id)
+    # Create new word
+    db_word = Word(lemma=word.lemma, language_id=language.id, embedding=embedding, embedding_model=embedding_model)
     db.add(db_word)
     db.commit()
     db.refresh(db_word)

@@ -198,7 +198,7 @@ class TextChunk(Base, TimestampMixin, EmbeddingMixin):
     pos = Column(Integer, nullable=False)
 
     # exact slice text
-    content = Column(Text, nullable=False)
+    content = Column(String, nullable=False)
 
     start_char = Column(Integer, nullable=True)
     end_char   = Column(Integer, nullable=True)

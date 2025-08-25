@@ -1,10 +1,6 @@
 from pydantic import Field, BaseModel, EmailStr, field_validator, ValidationInfo, RootModel
 from typing import List, Optional, Dict, Any, Optional, Set, TypedDict
-
-
-class WordBase(BaseModel):
-    word: str
-    language: str
+from crud_schemas import WordBase
 
 class TranslationResponse(RootModel[Dict[str, List[str]]]):
     "Dictionary where keys are words (lemmas) and values are translations"

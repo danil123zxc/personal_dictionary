@@ -1,16 +1,4 @@
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    restart: unless-stopped
-    volumes:
-      - ollama:/root/.ollama
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 60
-      start_period: 30s
   db:
     container_name: db
     image: pgvector/pgvector:pg16
@@ -20,43 +8,64 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql/data  
       - ./db/init:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"               
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d dictionary"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dictionary -h localhost -p 5432"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 60s
+
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    volumes:
+      - /mnt/data/docker-volumes/ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 5s
       timeout: 3s
-      retries: 20
+      retries: 60
+      start_period: 30s
 
   server:
     container_name: server
     build:
       context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/dictionary
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=gemma3n  
+      - OLLAMA_MODEL=gemma3n
       - LANGCHAIN_TRACING_V2=${LANGSMITH_TRACING}
       - LANGCHAIN_ENDPOINT=${LANGSMITH_ENDPOINT}
       - LANGCHAIN_API_KEY=${LANGSMITH_API_KEY}
-    env_file:
+      - PYTHONUNBUFFERED=1
+      - HF_HOME=/app/.cache/huggingface
+      - SENTENCE_TRANSFORMERS_HOME=/app/.cache/sentence-transformers
+      - XDG_CACHE_HOME=/app/.cache
+    env_file: 
       - .env
     volumes:
-      - ./:/app
+      - ./:/app:delegated
+      - /mnt/data/docker-volumes/app-cache:/app/.cache
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
       --reload
-
 volumes:
-  db-data:
-  ollama:
+  db-data:    

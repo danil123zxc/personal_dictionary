@@ -9,7 +9,6 @@ from app.prompts import translation_prompt, definition_prompt, example_prompt
 from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import os
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Get the root directory (parent of app directory)
 root_dir = Path(__file__).parent.parent
@@ -92,7 +91,7 @@ def generate_translation(text: str, src_language: str, tgt_language: str) -> dic
     structured_output = TranslationRead(words=response, text=text, src_language=src_language, tgt_language=tgt_language)
     return structured_output
 
-@traceable('definitions')
+@traceable(name='definitions')
 def generate_definition(word: str, language: str,  context: Optional[str]=None) -> dict:
     """
     Generate definition for a given word in a specified language.
