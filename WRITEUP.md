@@ -419,25 +419,7 @@ def embed(text: str, chunk_size: int = 220, chunk_overlap: int = 30) -> List[Doc
     return docs
 ```
 
-### 7.2 Similarity Search Implementation
-
-```python
-# Vector similarity search using pgvector
-def find_similar_words(word_embedding: List[float], top_k: int = 5) -> List[Word]:
-    """
-    Find semantically similar words using cosine similarity.
-    """
-    similar_words = (
-        db.query(Word)
-        .filter(Word.embedding.cosine_distance(word_embedding) < 0.3)
-        .order_by(Word.embedding.cosine_distance(word_embedding))
-        .limit(top_k)
-        .all()
-    )
-    return similar_words
-```
-
-### 7.3 Embedding Storage Strategy
+### 7.2 Embedding Storage Strategy
 
 - **Model**: all-MiniLM-L6-v2 (384 dimensions)
 - **Normalization**: L2 normalization for cosine similarity
@@ -528,25 +510,7 @@ def create_word(word: WordBase, db: Session = Depends(get_db)):
     # Database operations...
 ```
 
-### 9.3 Error Handling
-
-```python
-# Custom exception handling
-from fastapi import HTTPException, status
-
-class WordAlreadyExistsError(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Word already exists in this language"
-        )
-
-# Usage in business logic
-if existing_word:
-    raise WordAlreadyExistsError()
-```
-
-### 9.4 Structured Output Parsing
+### 9.3 Structured Output Parsing
 
 ```python
 # LangChain structured output
@@ -572,45 +536,11 @@ response = structured_llm.invoke(messages)
 - **Connection Pooling**: SQLAlchemy connection pool configuration
 - **Query Optimization**: Eager loading for related data
 
-### 10.2 Caching Strategy
-
-```python
-# Redis caching for frequently accessed data
-import redis
-from functools import wraps
-
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
-
-def cache_result(expire_time: int = 3600):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            cache_key = f"{func.__name__}:{hash(str(args) + str(kwargs))}"
-            cached_result = redis_client.get(cache_key)
-            
-            if cached_result:
-                return json.loads(cached_result)
-            
-            result = func(*args, **kwargs)
-            redis_client.setex(cache_key, expire_time, json.dumps(result))
-            return result
-        return wrapper
-    return decorator
-```
-
-### 10.3 LLM Optimization
+### 10.2 LLM Optimization
 
 - **Batch Processing**: Process multiple words in single LLM calls
 - **Temperature Control**: Balance creativity vs. consistency
 - **Prompt Optimization**: Minimize token usage while maintaining quality
-- **Response Caching**: Cache similar requests to reduce LLM calls
-
-### 10.4 Vector Search Optimization
-
-- **Index Tuning**: Optimize IVFFlat parameters for dataset size
-- **Batch Embedding**: Generate embeddings in batches
-- **Similarity Thresholds**: Use appropriate distance thresholds
-- **Result Limiting**: Limit search results to prevent performance issues
 
 ## 11. Challenges & Solutions
 
@@ -621,16 +551,6 @@ def cache_result(expire_time: int = 3600):
 **Solution**: 
 - Implemented Pydantic output parsers with retry logic
 - Used structured prompts with explicit JSON formatting instructions
-- Added fallback parsing for malformed responses
-
-```python
-def parse_llm_response(response: str) -> Dict:
-    try:
-        return json.loads(response)
-    except json.JSONDecodeError:
-        # Fallback parsing logic
-        return extract_structured_data(response)
-```
 
 ### 11.2 Vector Embedding Performance
 
@@ -675,13 +595,6 @@ def parse_llm_response(response: str) -> Dict:
 ### 12.1 Planned Features
 
 #### Spaced Repetition System
-```python
-# Spaced repetition algorithm implementation
-class SpacedRepetition:
-    def calculate_next_review(self, word: Word, user_progress: UserWordProgress) -> datetime:
-        """Calculate optimal next review time based on forgetting curve."""
-        # Implementation details...
-```
 
 #### Interactive Quizzes
 - Multiple choice questions based on vocabulary
