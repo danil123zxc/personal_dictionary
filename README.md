@@ -137,61 +137,6 @@ Input Text → Word Extraction → Translation → Definition → Examples → S
 
 ## 🧠 Tech Stack
 
-### Backend & API
-- **[FastAPI](https://fastapi.tiangolo.com/)** — Modern, fast web framework for building APIs
-- **[SQLAlchemy](https://sqlalchemy.org/)** — SQL toolkit and ORM
-- **[Alembic](https://alembic.sqlalchemy.org/)** — Database migration tool
-- **[PostgreSQL](https://postgresql.org/)** — Primary database
-- **[pgvector](https://github.com/pgvector/pgvector)** — Vector similarity search
-
-### AI & ML
-- **[Ollama](https://ollama.ai/)** — Local LLM deployment
-- **[Gemma 3n](https://huggingface.co/google/gemma-3n)** — Multilingual language model
-- **[LangChain](https://langchain.com/)** — LLM application framework
-- **[HuggingFace](https://huggingface.co/)** — Transformers and embeddings
-- **[Sentence Transformers](https://sbert.net/)** — Semantic embeddings
-
-### Security & Authentication
-- **[JWT](https://jwt.io/)** — JSON Web Tokens for authentication
-- **[Passlib](https://passlib.readthedocs.io/)** — Password hashing with bcrypt
-- **[OAuth2](https://oauth.net/2/)** — Password bearer token flow
-
-## 📊 Database Schema
-
-The application uses a relational database with the following key entities:
-
-- **Users** - User accounts and authentication
-- **Languages** - Supported languages and codes
-- **Learning Profiles** - User language learning configurations
-- **Words** - Vocabulary with vector embeddings
-- **Dictionaries** - Personal word collections
-- **Translations** - Word translations in different languages
-- **Definitions** - Word definitions with context
-- **Examples** - Usage examples for words
-- **Texts** - User text entries for learning
-
-## 🔧 Configuration
-
-### Environment Variables
-
-```bash
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/personal_dict
-
-# Security
-SECRET_KEY=your-secret-key-here
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# AI Models
-OLLAMA_BASE_URL=http://ollama:11434
-EMBEDDINGS_MODEL_NAME=all-MiniLM-L6-v2
-EMBEDDINGS_DEVICE=cpu
-
-# LangSmith (optional)
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your-api-key
-```
-
 ### Supported Languages
 
 | Language | Code | Name |
@@ -266,22 +211,5 @@ curl -X POST "http://localhost:8000/definition" \
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙌 Acknowledgments
-
-- **[Ollama](https://ollama.ai/)** — For running Gemma 3n locally
-- **[LangChain](https://langchain.com/)** — For the pipeline architecture
-- **[HuggingFace](https://huggingface.co/)** — For MiniLM embeddings and models
-- **[FastAPI](https://fastapi.tiangolo.com/)** — For the excellent web framework
-- **[pgvector](https://github.com/pgvector/pgvector)** — For vector similarity search
-
-## 📞 Support
-
-If you have any questions or need help, please:
-
-1. Check the [API Documentation](http://localhost:8000/docs)
-2. Review the [Technical Writeup](WRITEUP.md)
-3. Open an [Issue](https://github.com/your-repo/issues)
-
----
 
 **Built with ❤️ for language learners everywhere**
