@@ -150,5 +150,4 @@ class State(TypedDict):
     definitions: Dict[str, List[str]]  
     examples: Dict[str, List[str]] 
     examples_number: Dict[str, int]
-    similar_words: Dict[str, List[str]]  
-    saved_to_json: bool
+    synonyms: Dict[str, List[str]]  

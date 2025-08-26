@@ -1,6 +1,7 @@
 from app.generate import generate_translation, generate_definition, generate_examples, codes_language, language_codes
 from langgraph.graph import StateGraph, START, END
 from app.schemas import State, AllRead
+from app.crud import get_synonyms
 
 def translate_words_node(state: State) -> dict:
     """
@@ -102,5 +103,29 @@ def generate_examples_node(state: State) -> dict:
         'examples': examples
     }
 
+def get_synonyms_node(state: State) -> dict:
+    """
+    Node: Get synonyms for each word.
 
+    This function:
+    1. Iterates over existing words in `synonyms`.
+    2. Calls `get_synonyms()` for each word.
+    3. Extends the synonyms list if new ones are found.
+
+
+    Args:
+        state (State): Current state containing `synonyms` and `src_language`.
+
+    Returns:
+        dict: Updated 'synonyms' key in state.
+    """
+    synonyms = state['synonyms']    
+
+    for word in synonyms.keys():
+        synonyms[word] = get_synonyms(
+            word,
+            codes_language[state['src_language']]
+        )
+
+    return {'synonyms': synonyms}
 

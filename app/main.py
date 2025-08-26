@@ -17,6 +17,7 @@ from app import auth
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
 from app.embeddings import embed
+from app import crud
 
 # Initialize FastAPI application with metadata for Swagger documentation
 app = FastAPI(
@@ -65,29 +66,7 @@ def register_user(payload: UserCreate, db: db_dependency) -> UserRead:
             "confirm_password": "securepassword123"
         }
     """
-    # Normalize email to lowercase for consistency
-    email_norm = payload.email.strip().lower()
-    
-    # Check if user with the same username or email already exists
-    existing_user = db.query(User).filter(
-        (User.username == payload.username) |
-        (User.email == email_norm)
-    ).first()
-
-    if existing_user:
-        raise HTTPException(status_code=409, detail="Username or email already registered")
-    
-    # Create new user with hashed password
-    db_user = User(
-        username=payload.username, 
-        full_name=payload.full_name, 
-        email=email_norm, 
-        password=auth.get_password_hash(payload.password)
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    return crud.register_user(db, payload)
 
 @app.post("/login", response_model=Token, status_code=status.HTTP_200_OK)
 def login(db: db_dependency, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
@@ -114,22 +93,7 @@ def login(db: db_dependency, form_data: Annotated[OAuth2PasswordRequestForm, Dep
         - username: john_doe
         - password: securepassword123
     """
-    # Authenticate user credentials
-    user = auth.authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Incorrect username or password", 
-            headers={"WWW-Authenticate": "Bearer"}
-        )
-    
-    # Generate JWT access token with expiration
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": str(user.id)},  # Store user ID as string in JWT
-        expires_delta=access_token_expires
-    )
-    return Token(access_token=access_token, token_type="bearer")
+    return crud.login(db, form_data.username, form_data.password)
 
 @app.get("/users/me", response_model=UserRead)
 def read_user_me(current_user: Annotated[User, Depends(auth.get_current_active_user)]):
@@ -177,25 +141,7 @@ def get_user_info(db: db_dependency,
         GET /users/?username=john_doe
         GET /users/?user_id=123&username=john_doe
     """
-    # Build query based on provided parameters
-    if user_id and username:
-        # Both parameters provided - both must match
-        user = db.query(User).filter(
-            (User.username == username) & (User.id == user_id)
-        ).first()
-    elif user_id:
-        # Search by user ID only
-        user = db.query(User).filter(User.id == user_id).first()
-    elif username:
-        # Search by username only
-        user = db.query(User).filter(User.username == username).first()
-    else:
-        # No search criteria provided
-        raise HTTPException(status_code=400, detail="Must provide either user_id or username")
-
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found")
-    return user
+    return crud.get_user_info(db, user_id=user_id, username=username)
 
 @app.put("/update_user/me", response_model=UserRead)
 def update_current_user(
@@ -229,49 +175,7 @@ def update_current_user(
             "email": "newemail@example.com"
         }
     """
-    # Guard: check if there are any fields to update
-    if (payload.username is None and payload.full_name is None and 
-        payload.email is None and payload.disabled is None):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No fields to update",
-        )
-
-    # Check username uniqueness (only if username is being changed)
-    if payload.username and payload.username != current_user.username:
-        exists = db.query(User).filter(User.username == payload.username).first()
-        if exists:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Username already taken",
-            )
-
-    # Check email uniqueness (only if email is being changed)
-    if payload.email and payload.email != current_user.email:
-        exists = db.query(User).filter(User.email == payload.email).first()
-        if exists:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered",
-            )
-
-    # Apply changes to user object
-    if payload.username is not None:
-        current_user.username = payload.username
-    if payload.full_name is not None:
-        current_user.full_name = payload.full_name
-    if payload.email is not None:
-        current_user.email = payload.email
-    if payload.disabled is not None:
-        current_user.disabled = payload.disabled
-
-    # Persist changes to database
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
-
-    # Return safe public model (without password)
-    return UserRead.model_validate(current_user)
+    return crud.update_current_user(db, current_user, payload)
 
 @app.delete("/user_delete/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_current_user(
@@ -304,24 +208,7 @@ def delete_current_user(
         DELETE /user_delete/me
         DELETE /user_delete/me?hard=true
     """
-    if not hard:
-        # Soft delete (idempotent) - just mark as disabled
-        if not current_user.disabled:
-            current_user.disabled = True
-            db.add(current_user)
-            db.commit()
-        return  # 204 No Content
-
-    # Hard delete (may fail if FK cascades aren't configured)
-    try:
-        db.delete(current_user)
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Hard delete failed: related records exist. Enable cascade or remove dependents first.",
-        )
+    return crud.delete_current_user(db, current_user, hard)
 
 # -----------------------------------------------------------------------------
 # Language Management Endpoints
@@ -351,37 +238,7 @@ def create_language(language: LanguageBase, db: db_dependency) -> LanguageRead:
             "name": "English"
         }
     """
-    # Map language name to ISO code using predefined mapping
-    code = language_codes.get(language.name)
-
-    if not code:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid language"
-        )
-    
-    # Check if language already exists (by name or code)
-    existing_language = (
-        db.query(Language)
-        .filter(
-            (Language.name == language.name) | (Language.code == code)
-        )
-        .first()
-    )
-
-    if existing_language:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Language already exists"
-        )
-    
-    # Create new language entry
-    db_language = Language(name=language.name, code=code)
-    db.add(db_language)
-    db.commit()
-    db.refresh(db_language)
-
-    return LanguageRead.model_validate(db_language, from_attributes=True)
+    return crud.create_language(db, language)
 
 # -----------------------------------------------------------------------------
 # Learning Profile Management Endpoints
@@ -419,35 +276,7 @@ def create_learning_profile(
             "is_active": true
         }
     """
-    # Check if profile already exists for this user with same language pair
-    learning_profile_db = (
-        db.query(LearningProfile)
-        .filter(
-            (LearningProfile.user_id == current_user.id) &
-            (LearningProfile.primary_language_id == learning_profile.primary_language_id) &
-            (LearningProfile.foreign_language_id == learning_profile.foreign_language_id)
-        )
-        .first()
-    )
-    if learning_profile_db:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Profile already exists"
-        )
-
-    # Create new learning profile
-    created_lp = LearningProfile(
-        user_id=current_user.id, 
-        primary_language_id=learning_profile.primary_language_id,
-        foreign_language_id=learning_profile.foreign_language_id,
-        is_active=learning_profile.is_active,
-    )
-
-    db.add(created_lp)
-    db.commit()
-    db.refresh(created_lp)
-
-    return LearningProfileRead.model_validate(created_lp, from_attributes=True)
+    return crud.create_learning_profile(db, learning_profile, current_user)
 
 # -----------------------------------------------------------------------------
 # Word Management Endpoints
@@ -479,46 +308,7 @@ def create_word(word: WordBase, db: db_dependency) -> WordRead:
             "language_id": 1
         }
     """
-    # Validate that the referenced language exists
-    language = db.query(Language).filter(Language.id == word.language_id).first()
-    if not language:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Language doesn't exist"
-        )
-
-    # Check if word already exists for this language
-    exists = (
-        db.query(Word)
-        .filter(
-            (Word.lemma == word.lemma) &
-            (Word.language_id == word.language_id)
-        )
-        .first()
-    )
-    if exists:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Word already exists"
-        )
-    
-    # Generate vector embeddings for semantic search
-    embedding_doc = embed(word.lemma)
-    embedding = embedding_doc[0].metadata.get('embedding')  # Get actual vector
-    embedding_model = embedding_doc[0].metadata.get('model')  # Get model name
-
-    # Create new word with embeddings
-    db_word = Word(
-        lemma=word.lemma, 
-        language_id=language.id, 
-        embedding=embedding, 
-        embedding_model=embedding_model
-    )
-    db.add(db_word)
-    db.commit()
-    db.refresh(db_word)
-
-    return WordRead.model_validate(db_word, from_attributes=True)
+    return crud.create_word(db, word)
 
 # -----------------------------------------------------------------------------
 # Dictionary Management Endpoints
@@ -556,42 +346,7 @@ def create_in_dictionary(
             "notes": "Important word to remember"
         }
     """
-    # Ensure the learning profile belongs to the current user
-    lp = (
-        db.query(LearningProfile)
-        .filter(
-            (LearningProfile.id == dictionary.learning_profile_id)
-            & (LearningProfile.user_id == current_user.id)
-        )
-        .first()
-    )
-    if lp is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: profile doesn't belong to you"
-        )
-
-    # Check if word already exists in this learning profile's dictionary
-    exists = (
-        db.query(Dictionary)
-        .filter(
-            (Dictionary.learning_profile_id == dictionary.learning_profile_id)
-            & (Dictionary.word_id == dictionary.word_id)
-        )
-        .first()
-    )
-    if exists:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This word already exists in your dictionary"
-        )
-
-    # Create new dictionary entry
-    create_dictionary = Dictionary(**dictionary.model_dump())
-    db.add(create_dictionary)
-    db.commit()
-    db.refresh(create_dictionary)
-    return DictionaryRead.model_validate(create_dictionary, from_attributes=True)
+    return crud.create_in_dictionary(db, dictionary, current_user)
 
 # -----------------------------------------------------------------------------
 # Translation Management Endpoints
@@ -629,43 +384,7 @@ def create_translation(
             "dictionary_id": 10
         }
     """
-    # Validate that the language exists
-    lang = db.query(Language).filter(Language.id == translation.language_id).first()
-    if lang is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Language not found"
-        )
-
-    # Validate dictionary entry exists and belongs to current user
-    dic = (
-        db.query(Dictionary)
-        .options(selectinload(Dictionary.learning_profile))  # Eager load learning profile
-        .filter(Dictionary.id == translation.dictionary_id)
-        .first()
-    )
-    if dic is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Dictionary entry not found"
-        )
-    if dic.learning_profile.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: dictionary entry doesn't belong to you"
-        )
-
-    # Create translation entry
-    row = Translation(
-        dictionary_id=translation.dictionary_id,
-        language_id=translation.language_id,
-        translation=translation.translation,
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-
-    return TranslationRead.model_validate(row, from_attributes=True)
+    return crud.create_translation(db, translation, current_user)
 
 # -----------------------------------------------------------------------------
 # Text Management Endpoints
@@ -702,42 +421,7 @@ def create_text(
             "text": "Hello, how are you today?"
         }
     """
-    # Get the user's active learning profile
-    learning_profile = (
-        db.query(LearningProfile)
-        .filter(
-            LearningProfile.user_id == current_user.id,
-            LearningProfile.is_active == True
-        )
-        .first()
-    )
-
-    if not learning_profile:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No active learning profile found for current user."
-        )
-
-    # Create new Text instance
-    new_text = Text(
-        text=text.text,
-        dictionary_id=text.dictionary_id,  # Can be None if not provided
-        learning_profile_id=learning_profile.id
-    )
-
-    # Add and commit with error handling
-    db.add(new_text)
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not create text: {str(e)}"
-        )
-    db.refresh(new_text)
-
-    return TextRead.model_validate(new_text, from_attributes=True)
+    return crud.create_text(db, text, current_user)
 
 # -----------------------------------------------------------------------------
 # AI-Powered Generation Endpoints

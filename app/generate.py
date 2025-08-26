@@ -9,6 +9,14 @@ from app.prompts import translation_prompt, definition_prompt, example_prompt
 from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import os
+from typing import List, Dict
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langsmith import traceable
+from langchain_core.documents import Document
+from sqlalchemy.engine import Engine
+import os
+import math
 
 # Get the root directory (parent of app directory)
 root_dir = Path(__file__).parent.parent
@@ -18,6 +26,27 @@ env_path = root_dir / '.env'
 load_dotenv(dotenv_path=env_path)
 
 
+# -----------------------------------------------------------------------------
+# Embeddings backend configuration
+# You can override these via your project's .env
+#   EMBEDDINGS_MODEL_NAME=all-MiniLM-L6-v2
+#   EMBEDDINGS_DEVICE=cuda   (or "cpu", "mps" on Apple Silicon)
+# -----------------------------------------------------------------------------
+
+# Model configuration from environment variables
+EMBEDDINGS_MODEL_NAME = os.getenv("EMBEDDINGS_MODEL_NAME", "all-MiniLM-L6-v2")
+EMBEDDINGS_DEVICE = os.getenv("EMBEDDINGS_DEVICE", "cpu")
+
+# Initialize HuggingFace embeddings model
+# We enable L2 normalization on the model side — useful for cosine similarity,
+# nearest neighbor search, and pgvector("cosine") indexing.
+_embeddings = HuggingFaceEmbeddings(
+    model_name=EMBEDDINGS_MODEL_NAME,
+    model_kwargs={"device": EMBEDDINGS_DEVICE},
+    encode_kwargs={"normalize_embeddings": True},  # ensures unit-length vectors
+)
+
+# Our gemma3n model is hosted on Ollama
 llm = ChatOllama( 
     model="gemma3n",
     base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
@@ -157,78 +186,93 @@ def generate_examples(word: str, language: str, examples_number: int = 1, defini
 
     return ExamplesRead(examples=response.examples, word=word, language=language, examples_number=examples_number, definition=definition)
 
-
-EMBEDDINGS_MODEL_NAME = os.getenv("EMBEDDINGS_MODEL_NAME", "all-MiniLM-L6-v2")
-EMBEDDINGS_DEVICE = os.getenv("EMBEDDINGS_DEVICE", "cpu")
-
-@traceable(name='embed_word')
-def embed_single_word(word: str):
+@traceable(name="embed")
+def embed(text: str, 
+        chunk_size: Optional[int] = 220, 
+        chunk_overlap: Optional[int] = 30
+        ) -> List[Document]:
     """
-    Takes single word and and returns 
+    Split text into chunks, embed each chunk, and return Documents
+    with embedding stored in metadata.
+
+    This function processes input text by:
+    1. Splitting it into manageable chunks using RecursiveCharacterTextSplitter
+    2. Generating vector embeddings for each chunk using the configured model
+    3. Storing embeddings and metadata in Document objects
+
+    Parameters
+    ----------
+    text : str
+        The input text to be segmented and embedded.
+    chunk_size : int, optional (default=220)
+        Maximum character length for each chunk. The text will be 
+        split recursively to avoid exceeding this size.
+    chunk_overlap : int, optional (default=30)
+        Number of overlapping characters between consecutive chunks 
+        to preserve semantic continuity.
+
+    Returns
+    -------
+    List[Document]
+        A list of LangChain `Document` objects. Each document has:
+        - `page_content` : str
+            The raw text content of the chunk.
+        - `metadata["embedding"]` : List[float]
+            The vector representation of the chunk produced by the
+            configured embedding model.
+        - `metadata["model"]` : str
+            Name/identifier of the embedding model used.
+        - `metadata["start_index"]` : int
+            Character index in the original text where the chunk begins.
+        - `metadata["end"]` : int
+            Character index in the original text where the chunk ends.
+
+    Example
+    -------
+    >>> text = "LangChain provides a standard interface for chains, as well as a collection of utilities..."
+    >>> docs = embed(text, chunk_size=50, chunk_overlap=10)
+    >>> docs[0].page_content
+    'LangChain provides a standard interface for chains,'
+    >>> docs[0].metadata.keys()
+    dict_keys(['start_index', 'embedding', 'model', 'end'])
+    >>> len(docs)
+    3
+
+    Notes
+    -----
+    - The function uses RecursiveCharacterTextSplitter which tries to split on
+      natural boundaries (spaces, punctuation) before falling back to character-level splitting.
+    - Embeddings are L2-normalized for consistent cosine similarity calculations.
+    - The chunk_overlap helps maintain context between chunks for better semantic understanding.
     """
-    if not word:
-        raise ValueError("Word must be a non-empty string")
+    # Initialize text splitter with specified parameters
+    # add_start_index=True adds character position tracking to metadata
 
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, 
+        chunk_overlap=chunk_overlap, 
+        add_start_index=True
+    )
 
+    
+    # Split text into documents
+    docs = text_splitter.create_documents([text])
+    
+    # Extract text content from documents for embedding
+    chunks = [doc.page_content for doc in docs]
+    
+    # Generate embeddings for all chunks in a single batch
+    # This is more efficient than embedding chunks individually
+    embs = _embeddings.embed_documents(chunks)
 
-# def get_similar_words_rag(word: str, text: str, k: int = 5) -> List[str]:
-#     """
-#     Retrieve a list of words similar to the given input word using a RAG (Retrieval-Augmented Generation) retriever.
+    # Attach embeddings and metadata to each document
+    for doc, emb in zip(docs, embs):
+        # Store the embedding vector in metadata
+        doc.metadata["embedding"] = emb  
+        # Store the model name for reference
+        doc.metadata["model"] = EMBEDDINGS_MODEL_NAME
+        # Calculate end position based on start position and content length
+        start = doc.metadata["start_index"]
+        doc.metadata["end"] = start + len(doc.page_content)
 
-#     This function queries a retriever object for documents related to the given `word` 
-#     and then extracts similar words from the retrieved content. The retrieved documents 
-#     are processed as either JSON (from which keys are extracted) or plain text.
-
-#     Args:
-#         word (str):
-#             The input word to search for.
-#         text (str):
-#             The reference text or corpus to be searched against.
-#             (Currently unused in this implementation.)
-#         k (int, optional):
-#             The maximum number of retrieved results to process.
-#             Defaults to 5.
-
-#     Returns:
-#         List[str]:
-#             A list of similar words found in the retrieved documents.
-#             Returns an empty list if retrieval fails or no valid data is found.
-
-#     Notes:
-#         - Requires a global `retriever` object with an `.invoke()` method 
-#           that returns either a list of documents or a single document.
-#         - Each document must have a `.page_content` attribute.
-#         - If `.page_content` is JSON, the keys are extracted as similar words.
-#           If it's plain text, the content itself is added to the result.
-#         - All retrieval and parsing errors are caugsht and logged to console.
-
-#     Example:
-#         >>> get_similar_words_rag("apple", "", k=3)
-#         ['fruit', 'macintosh', 'granny smith']
-#     """
-#     try:
-#         # Query retriever for documents related to the input word
-#         results = retriever.invoke(word)
-
-#         # Ensure results is always a list for consistent iteration
-#         if not isinstance(results, list):
-#             results = [results]
-
-#         similar_words = []
-
-#         # Process up to k retrieved documents
-#         for doc in results[:k]:
-#             try:
-#                 # Try to parse content as JSON and extract dictionary keys
-#                 data = json.loads(doc.page_content)
-#                 similar_words.extend(data.keys())
-#             except json.JSONDecodeError:
-#                 # If parsing fails, treat content as plain text
-#                 similar_words.append(doc.page_content)
-
-#         return similar_words
-
-#     except Exception as e:
-#         # Log the retrieval failure
-#         print(f"[DEBUG] RAG search failed for '{word}': {e}")
-#         return []
+    return docs
