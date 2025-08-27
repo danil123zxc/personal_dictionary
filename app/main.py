@@ -16,7 +16,7 @@ import os
 from app import auth
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
-from app.embeddings import embed
+from app.generate import embed
 from app import crud
 
 # Initialize FastAPI application with metadata for Swagger documentation

@@ -89,9 +89,9 @@ class TranslationRead(TranslationBase):
 
 #Definition
 class DefinitionBase(BaseModel):
-    definition_text: str = Field(..., min_length=1)
-    language_id: int
     dictionary_id: int
+    language_id: int
+    definition_text: str = Field(..., min_length=1)
     original_text_id: Optional[int] = None
 
 class DefinitionRead(DefinitionBase):
@@ -99,9 +99,10 @@ class DefinitionRead(DefinitionBase):
     model_config = ConfigDict(from_attributes=True)
 #Examples
 class ExampleBase(BaseModel):
-    example_text: str = Field(..., min_length=1)
-    language_id: int
     dictionary_id: int
+    language_id: int
+    example_text: str = Field(..., min_length=1)
+        
 
 class ExampleRead(ExampleBase):
     id: int

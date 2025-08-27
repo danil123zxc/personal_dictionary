@@ -4,6 +4,7 @@ from typing import Annotated, Optional, Dict, Any, List
 from sqlalchemy.orm import Session, selectinload
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from datetime import datetime
 from app.crud_schemas import (
     WordBase, WordRead, DictionaryBase, DictionaryRead, TranslationBase, TranslationRead,
     DefinitionBase, DefinitionRead, ExampleBase, ExampleRead, TextBase, TextRead,
@@ -16,8 +17,9 @@ from app.models import (
 from app.database import get_db
 from app import auth
 from datetime import timedelta
-from app.embeddings import embed
-from pgvector.sqlalchemy import cosine_distance
+from app.generate import embed, language_codes
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import func
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
@@ -71,40 +73,6 @@ def get_user_info(db: db_dependency, user_id: Optional[int] = None, username: Op
     return UserRead.model_validate(user)
 
 
-def update_current_user(db: db_dependency, current_user: User, payload: UserUpdate) -> UserRead:
-    if (
-        payload.username is None
-        and payload.full_name is None
-        and payload.email is None
-        and payload.disabled is None
-    ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
-
-    if payload.username and payload.username != current_user.username:
-        exists = db.query(User).filter(User.username == payload.username).first()
-        if exists:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
-
-    if payload.email and payload.email != current_user.email:
-        exists = db.query(User).filter(User.email == payload.email).first()
-        if exists:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-
-    if payload.username is not None:
-        current_user.username = payload.username
-    if payload.full_name is not None:
-        current_user.full_name = payload.full_name
-    if payload.email is not None:
-        current_user.email = payload.email
-    if payload.disabled is not None:
-        current_user.disabled = payload.disabled
-
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
-    return UserRead.model_validate(current_user)
-
-
 def delete_current_user(db: db_dependency, current_user: User, hard: bool) -> None:
     if not hard:
         if not current_user.disabled:
@@ -124,8 +92,6 @@ def delete_current_user(db: db_dependency, current_user: User, hard: bool) -> No
 
 
 def create_language(db: db_dependency, language: LanguageBase) -> LanguageRead:
-    from app.generate import language_codes
-
     code = language_codes.get(language.name)
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid language")
@@ -144,7 +110,9 @@ def create_language(db: db_dependency, language: LanguageBase) -> LanguageRead:
 
 
 def create_learning_profile(
-    db: db_dependency, learning_profile: LearningProfileBase, current_user: User
+    db: db_dependency, 
+    learning_profile: LearningProfileBase, 
+    current_user: Annotated[User, Depends(auth.get_current_active_user)]
 ) -> LearningProfileRead:
     learning_profile_db = (
         db.query(LearningProfile)
@@ -160,8 +128,8 @@ def create_learning_profile(
 
     created_lp = LearningProfile(
         user_id=current_user.id,
-        primary_language_id=learning_profile.primary_language_id,
-        foreign_language_id=learning_profile.foreign_language_id,
+                                 primary_language_id=learning_profile.primary_language_id,
+                                 foreign_language_id=learning_profile.foreign_language_id,
         is_active=learning_profile.is_active,
     )
     db.add(created_lp)
@@ -200,7 +168,7 @@ def create_word(db: db_dependency, word: WordBase) -> WordRead:
 
 
 def create_in_dictionary(
-    db: db_dependency, dictionary: DictionaryBase, current_user: User
+    db: db_dependency, dictionary: DictionaryBase, current_user: Annotated[User, Depends(auth.get_current_active_user)]
 ) -> DictionaryRead:
     lp = (
         db.query(LearningProfile)
@@ -233,7 +201,8 @@ def create_in_dictionary(
 
 def create_translation(
     db: db_dependency, 
-    translation: TranslationBase, current_user: User
+    translation: TranslationBase, 
+    current_user: Annotated[User, Depends(auth.get_current_active_user)]
 ) -> TranslationRead:
     lang = db.query(Language).filter(Language.id == translation.language_id).first()
     if lang is None:
@@ -261,7 +230,7 @@ def create_translation(
     return TranslationRead.model_validate(row, from_attributes=True)
 
 
-def create_text(db: Session, text: TextBase, current_user: User) -> TextRead:
+def create_text(db: Session, text: TextBase, current_user: Annotated[User, Depends(auth.get_current_active_user)]) -> TextRead:
     learning_profile = (
         db.query(LearningProfile)
         .filter(LearningProfile.user_id == current_user.id, LearningProfile.is_active == True)
@@ -283,6 +252,31 @@ def create_text(db: Session, text: TextBase, current_user: User) -> TextRead:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not create text: {str(e)}")
     db.refresh(new_text)
     return TextRead.model_validate(new_text, from_attributes=True)
+
+def create_definition(db: db_dependency, definition: DefinitionBase) -> DefinitionRead:
+    try:
+        definition_db = Definition(**definition.model_dump())
+        db.add(definition_db)
+        db.commit()
+        db.refresh(definition_db)
+        return DefinitionRead.model_validate(definition_db, from_attributes=True)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not create definition: {str(e)}")
+
+def create_example(
+    db: db_dependency, 
+    example: ExampleBase
+) -> ExampleRead:
+    try:
+        example_db = Example(**example.model_dump())
+        db.add(example_db)
+        db.commit()
+        db.refresh(example_db)
+        return ExampleRead.model_validate(example_db, from_attributes=True)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not create example: {str(e)}")
 
 
 def get_synonyms(
@@ -330,12 +324,318 @@ def get_synonyms(
     max_distance = 1.0 - min_similarity
     
     # Single query with similarity threshold and ordering
+    # Use 1 - cosine_similarity for distance calculation
     neighbors: List[Word] = (
         query
-        .filter(cosine_distance(Word.embedding, word_embedding) <= max_distance)
-        .order_by(cosine_distance(Word.embedding, word_embedding))
+        .filter(func.cosine_distance(Word.embedding, word_embedding) <= max_distance)
+        .order_by(func.cosine_distance(Word.embedding, word_embedding))
         .limit(top_k)
         .all()
     )  
 
     return [WordRead.model_validate(w, from_attributes=True) for w in neighbors]
+
+
+def update_word(
+    db: Session,
+    word_id: int,
+    updates: WordBase,
+    current_user: Annotated[User, Depends(auth.get_current_active_user)]
+) -> WordRead:
+    """
+    Update a word's information and optionally regenerate embeddings.
+    
+    Args:
+        db: SQLAlchemy session
+        word_id: ID of the word to update
+        updates: Dictionary of fields to update (lemma, language_id)
+        current_user: Current authenticated user
+        
+    Returns:
+        WordRead: Updated word object
+        
+    Raises:
+        HTTPException: 404 if word not found, 403 if not authorized, 409 if duplicate
+    """
+    # Find the word
+    word = db.query(Word).filter(Word.id == word_id).first()
+    if not word:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Word not found")
+    
+    # Check if user has access to this word through their dictionaries
+    user_has_access = (
+        db.query(Dictionary)
+        .join(LearningProfile, LearningProfile.id == Dictionary.learning_profile_id)
+        .filter(
+            Dictionary.word_id == word_id,
+            LearningProfile.user_id == current_user.id
+        )
+        .first()
+    )
+    
+    if not user_has_access:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this word")
+    
+    # Update fields
+    if updates.lemma != word.lemma:
+        # Check for duplicates if lemma is being changed
+        existing = db.query(Word).filter(
+            Word.lemma == updates.lemma,
+            Word.language_id == word.language_id,
+            Word.id != word_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Word already exists")
+        
+        word.lemma = updates.lemma
+        # Regenerate embedding for new lemma
+        try:
+            embedding_doc = embed(word.lemma)
+            word.embedding = embedding_doc[0].metadata.get('embedding')
+            word.embedding_model = embedding_doc[0].metadata.get('model')
+            word.embedding_updated_at = datetime.utcnow()
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not generate embedding: {str(e)}")
+    
+    if updates.language_id != word.language_id:
+        # Validate language exists
+        language = db.query(Language).filter(Language.id == updates.language_id).first()
+        if not language:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
+        
+        # Check for duplicates in new language
+        existing = db.query(Word).filter(
+            Word.lemma == word.lemma,
+            Word.language_id == updates.language_id,
+            Word.id != word_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Word already exists in this language")
+        
+        word.language_id = updates.language_id
+    
+    db.add(word)
+    db.commit()
+    db.refresh(word)
+    return WordRead.model_validate(word, from_attributes=True)
+
+
+def update_translation(
+    db: Session,
+    translation_id: int,
+    updates: TranslationBase,
+    current_user: Annotated[User, Depends(auth.get_current_active_user)]
+) -> TranslationRead:
+    """ 
+    Update a translation's information and optionally regenerate embeddings.
+    
+    Args:
+        db: SQLAlchemy session
+        translation_id: ID of the translation to update
+        updates: Dictionary of fields to update (translation, language_id)
+        current_user: Current authenticated user
+        
+    Returns:
+        TranslationRead: Updated translation object
+        
+    Raises:
+        HTTPException: 404 if translation not found, 403 if not authorized
+    """
+    # Find the translation
+    translation = db.query(Translation).filter(Translation.id == translation_id).first()
+    if not translation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Translation not found")
+    
+    # Check if user owns the dictionary entry
+    dictionary = (
+        db.query(Dictionary)
+        .options(selectinload(Dictionary.learning_profile))
+        .filter(Dictionary.id == translation.dictionary_id)
+        .first()
+    )
+    
+    if not dictionary or dictionary.learning_profile.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this translation")
+    
+    # Update fields
+    if updates.translation != translation.translation:
+        translation.translation = updates.translation
+        # Regenerate embedding for new translation text
+        try:
+            embedding_doc = embed(translation.translation)
+            translation.embedding = embedding_doc[0].metadata.get('embedding')
+            translation.embedding_model = embedding_doc[0].metadata.get('model')
+            translation.embedding_updated_at = datetime.utcnow()
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not generate embedding: {str(e)}")
+    
+    if updates.language_id != translation.language_id:
+        # Validate language exists
+        language = db.query(Language).filter(Language.id == updates.language_id).first()
+        if not language:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
+        
+        translation.language_id = updates.language_id
+    
+    db.add(translation)
+    db.commit()
+    db.refresh(translation)
+    return TranslationRead.model_validate(translation, from_attributes=True)
+
+
+def update_example(
+    db: Session,
+    example_id: int,
+    updates: ExampleBase,
+    current_user: Annotated[User, Depends(auth.get_current_active_user)]
+) -> ExampleRead:
+    """
+    Update an example's information and optionally regenerate embeddings.
+    
+    Args:
+        db: SQLAlchemy session
+        example_id: ID of the example to update
+        updates: Dictionary of fields to update (example_text, language_id)
+        current_user: Current authenticated user
+        
+    Returns:
+        ExampleRead: Updated example object
+        
+    Raises:
+        HTTPException: 404 if example not found, 403 if not authorized
+    """
+    # Find the example
+    example = db.query(Example).filter(Example.id == example_id).first()
+    if not example:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Example not found")
+    
+    # Check if user owns the dictionary entry
+    dictionary = (
+        db.query(Dictionary)
+        .options(selectinload(Dictionary.learning_profile))
+        .filter(Dictionary.id == example.dictionary_id)
+        .first()
+    )
+    
+    if not dictionary or dictionary.learning_profile.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this example")
+    
+    # Update fields
+    if updates.example_text != example.example_text:
+        example.example_text = updates.example_text
+        # Regenerate embedding for new example text
+        try:
+            embedding_doc = embed(example.example_text)
+            example.embedding = embedding_doc[0].metadata.get('embedding')
+            example.embedding_model = embedding_doc[0].metadata.get('model')
+            example.embedding_updated_at = datetime.utcnow()
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not generate embedding: {str(e)}")
+    
+    if updates.language_id != example.language_id:
+        # Validate language exists
+        language = db.query(Language).filter(Language.id == updates.language_id).first()
+        if not language:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
+        
+        example.language_id = updates.language_id
+    
+    db.add(example)
+    db.commit()
+    db.refresh(example)
+    return ExampleRead.model_validate(example, from_attributes=True)
+
+def update_current_user(db: db_dependency, current_user: User, payload: UserUpdate) -> UserRead:
+    if (
+        payload.username is None
+        and payload.full_name is None
+        and payload.email is None
+        and payload.disabled is None
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+
+    if payload.username and payload.username != current_user.username:
+        exists = db.query(User).filter(User.username == payload.username).first()
+        if exists:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+
+    if payload.email and payload.email != current_user.email:
+        exists = db.query(User).filter(User.email == payload.email).first()
+        if exists:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    if payload.username is not None:
+        current_user.username = payload.username
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name
+    if payload.email is not None:
+        current_user.email = payload.email
+    if payload.disabled is not None:
+        current_user.disabled = payload.disabled
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return UserRead.model_validate(current_user)
+
+def update_definition(
+    db: Session,
+    definition_id: int,
+    updates: DefinitionBase,
+    current_user: Annotated[User, Depends(auth.get_current_active_user)]
+) -> DefinitionRead:
+    """
+    Update a definition's information and optionally regenerate embeddings.
+    
+    Args:
+        db: SQLAlchemy session
+        definition_id: ID of the definition to update
+        updates: Dictionary of fields to update (definition_text, language_id)
+        current_user: Current authenticated user
+        
+    Returns:
+        DefinitionRead: Updated definition object
+        
+    Raises:
+        HTTPException: 404 if definition not found, 403 if not authorized
+    """
+    # Find the definition
+    definition = db.query(Definition).filter(Definition.id == definition_id).first()
+    if not definition:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Definition not found")
+    
+    # Check if user owns the dictionary entry
+    dictionary = (
+        db.query(Dictionary)
+        .options(selectinload(Dictionary.learning_profile))
+        .filter(Dictionary.id == definition.dictionary_id)
+        .first()
+    )
+    
+    if not dictionary or dictionary.learning_profile.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this definition")
+    
+    # Update fields
+    if updates.definition_text != definition.definition_text:
+        definition.definition_text = updates.definition_text
+        # Regenerate embedding for new definition text
+        try:
+            embedding_doc = embed(definition.definition_text)
+            definition.embedding = embedding_doc[0].metadata.get('embedding')
+            definition.embedding_model = embedding_doc[0].metadata.get('model')
+            definition.embedding_updated_at = datetime.utcnow()
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not generate embedding: {str(e)}")
+    
+    if updates.language_id != definition.language_id:
+        # Validate language exists
+        language = db.query(Language).filter(Language.id == updates.language_id).first()
+        if not language:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
+        
+        definition.language_id = updates.language_id
+    
+    db.add(definition)
+    db.commit()
+    db.refresh(definition)
+    return DefinitionRead.model_validate(definition, from_attributes=True)

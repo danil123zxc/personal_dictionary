@@ -140,7 +140,7 @@ class State(TypedDict):
         examples: Dictionary mapping words to examples
         examples_number: Dictionary mapping words to number of examples
         similar_words: Dictionary mapping words to similar words
-        saved_to_json: Flag indicating if results were saved
+        saved_to_db: Flag indicating if results were saved
     """
     text: str  
     src_language: str
@@ -151,3 +151,4 @@ class State(TypedDict):
     examples: Dict[str, List[str]] 
     examples_number: Dict[str, int]
     synonyms: Dict[str, List[str]]  
+    saved_to_db: bool = False

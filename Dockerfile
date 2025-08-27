@@ -21,12 +21,14 @@ RUN mkdir -p /home/appuser/.cache/huggingface/transformers \
              /home/appuser/.cache \
  && chown -R appuser:appuser /home/appuser/.cache
 
-COPY requirements.txt .
+COPY requirements.txt requirements-test.txt ./
 RUN sed -i "s/\r$//" requirements.txt
+RUN sed -i "s/\r$//" requirements-test.txt
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio \
- && pip install --no-cache-dir -r requirements.txt
+ && pip install --no-cache-dir -r requirements.txt \
+ && pip install --no-cache-dir -r requirements-test.txt
 
 COPY . .
 RUN chown -R appuser:appuser /app

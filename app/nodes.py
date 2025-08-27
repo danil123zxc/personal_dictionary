@@ -1,7 +1,7 @@
 from app.generate import generate_translation, generate_definition, generate_examples, codes_language, language_codes
 from langgraph.graph import StateGraph, START, END
 from app.schemas import State, AllRead
-from app.crud import get_synonyms
+from app.crud import get_synonyms, create_word, create_in_dictionary, create_translation, create_definition, create_example
 
 def translate_words_node(state: State) -> dict:
     """
@@ -129,3 +129,16 @@ def get_synonyms_node(state: State) -> dict:
 
     return {'synonyms': synonyms}
 
+def save_to_db_node(state: State) -> dict:
+    """
+    Node: Save the state to the database.
+    """
+    for word in state['words']:
+        create_word(word, state['src_language'])
+        create_in_dictionary(word, state['src_language'])
+        create_translation(word, state['tgt_language'])
+        create_definition(word, state['src_language'])
+        create_example(word, state['src_language'])
+
+
+    return {'saved_to_db': True}
