@@ -78,7 +78,7 @@ class DictionaryRead(DictionaryBase):
 
 #Translation
 class TranslationBase(BaseModel):
-    translation: str = Field(..., min_length=1)
+    translation: str 
     language_id: int
     dictionary_id: int
 

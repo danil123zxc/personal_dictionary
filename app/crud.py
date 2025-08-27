@@ -19,7 +19,7 @@ from app import auth
 from datetime import timedelta
 from app.generate import embed, language_codes
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import func
+from sqlalchemy import func, aliased
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
@@ -138,7 +138,10 @@ def create_learning_profile(
     return LearningProfileRead.model_validate(created_lp, from_attributes=True)
 
 
-def create_word(db: db_dependency, word: WordBase) -> WordRead:
+def create_word(
+    db: db_dependency, 
+    word: WordBase
+    ) -> WordRead:
     language = db.query(Language).filter(Language.id == word.language_id).first()
     if not language:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language doesn't exist")
@@ -230,19 +233,16 @@ def create_translation(
     return TranslationRead.model_validate(row, from_attributes=True)
 
 
-def create_text(db: Session, text: TextBase, current_user: Annotated[User, Depends(auth.get_current_active_user)]) -> TextRead:
-    learning_profile = (
-        db.query(LearningProfile)
-        .filter(LearningProfile.user_id == current_user.id, LearningProfile.is_active == True)
-        .first()
-    )
-    if not learning_profile:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active learning profile found for current user.")
+def create_text(
+    db: Session, 
+    text: TextBase, 
+    learning_profile_id: int
+    ) -> TextRead:
 
     new_text = Text(
         text=text.text,
         dictionary_id=text.dictionary_id,
-        learning_profile_id=learning_profile.id,
+        learning_profile_id=learning_profile_id,
     )
     db.add(new_text)
     try:
@@ -334,6 +334,49 @@ def get_synonyms(
     )  
 
     return [WordRead.model_validate(w, from_attributes=True) for w in neighbors]
+
+def get_learning_profile(
+    db: db_dependency, 
+    primary_language: str,
+    foreign_language: str,
+    current_user: Annotated[User, Depends(auth.get_current_active_user)]
+    ) -> LearningProfileRead:
+    # Use aliases for the two language joins
+    PrimaryLanguage = aliased(Language)
+    ForeignLanguage = aliased(Language)
+    
+    learning_profile = (
+        db.query(LearningProfile)
+        .join(PrimaryLanguage, PrimaryLanguage.id == LearningProfile.primary_language_id)
+        .join(ForeignLanguage, ForeignLanguage.id == LearningProfile.foreign_language_id)
+        .filter(
+            LearningProfile.user_id == current_user.id, 
+            PrimaryLanguage.name == primary_language,
+            ForeignLanguage.name == foreign_language,
+            LearningProfile.is_active == True
+        )
+        .first()
+    )
+    if not learning_profile:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active learning profile found for current user.")
+        
+    return LearningProfileRead.model_validate(learning_profile, from_attributes=True)
+
+def get_language_id(db: db_dependency, language_name: Optional[str]=None, language_code: Optional[str]=None) -> int:
+
+    if language_name:
+        language = db.query(Language).filter(Language.name == language_name).first()
+        if not language:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
+        return language.id
+
+    if language_code:
+        language = db.query(Language).filter(Language.code == language_code).first()
+        if not language:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Language not found")
+        return language.id
+
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No language provided")
 
 
 def update_word(

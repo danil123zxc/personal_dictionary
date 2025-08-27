@@ -2,9 +2,10 @@ from typing import List, Optional, Dict, Tuple, Any, Union, Set, Annotated
 import json
 from app.prompts import *
 from fastapi import FastAPI, HTTPException, Query, Body, Depends, status
-from app.generate import generate_translation, generate_definition, generate_examples, language_codes, codes_language, llm
+from app.generate import generate_translation, generate_definition, generate_examples, language_codes, codes_language, llm, embed
 from app.database import Base, engine, get_db
 from app.models import *
+from app.crud import get_learning_profile
 from app.schemas import TranslationRead as SchemaTranslationRead, ExamplesRead as SchemaExamplesRead, DefinitionRead as SchemaDefinitionRead, TranslationResponse, TranslationInput, ExamplesInput, DefinitionInput
 from sqlalchemy.orm import Session, selectinload
 from app.crud_schemas import (
@@ -16,7 +17,6 @@ import os
 from app import auth
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
-from app.generate import embed
 from app import crud
 
 # Initialize FastAPI application with metadata for Swagger documentation
@@ -421,7 +421,8 @@ def create_text(
             "text": "Hello, how are you today?"
         }
     """
-    return crud.create_text(db, text, current_user)
+    learning_profile_id = get_learning_profile(db, current_user)
+    return crud.create_text(db, text, learning_profile_id)
 
 # -----------------------------------------------------------------------------
 # AI-Powered Generation Endpoints

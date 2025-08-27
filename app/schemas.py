@@ -2,6 +2,8 @@ from pydantic import Field, BaseModel, EmailStr, field_validator, ValidationInfo
 
 from typing import List, Optional, Dict, Any, Set, TypedDict
 from app.crud_schemas import WordBase
+from app.database import db_dependency
+from app.crud_schemas import LearningProfileRead
 
 class TranslationResponse(RootModel[Dict[str, List[str]]]):
     """
@@ -123,6 +125,15 @@ class AllRead(TranslationInput, DefinitionRead, ExamplesRead):
     """
     pass
 
+class Context(LearningProfileRead):
+    """
+    Context model for language processing workflows.
+    
+    This model extends LearningProfileRead to include additional context
+    for language processing workflows.
+    """
+    db: db_dependency
+
 class State(TypedDict):
     """
     Workflow state model for language processing pipelines.
@@ -141,14 +152,29 @@ class State(TypedDict):
         examples_number: Dictionary mapping words to number of examples
         similar_words: Dictionary mapping words to similar words
         saved_to_db: Flag indicating if results were saved
+        created_words: List of words that were successfully created
+        existing_words: List of words that already existed in the database  
     """
     text: str  
-    src_language: str
-    tgt_language: str
-    words: Set[str] 
-    translations: Dict[str, List[str]] 
-    definitions: Dict[str, List[str]]  
-    examples: Dict[str, List[str]] 
-    examples_number: Dict[str, int]
-    synonyms: Dict[str, List[str]]  
-    saved_to_db: bool = False
+    words: Set[str] = Field(default_factory=set, description="Set of extracted words")
+    translations: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping words to translations")
+    definitions: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping words to definitions")
+    examples: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping words to examples")
+    examples_number: Dict[str, int] = Field(default_factory=dict, description="Dictionary mapping words to number of examples")
+    synonyms: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping words to similar words")
+    dictionaries: Dict[str, int] = Field(default_factory=dict, description="Dictionary mapping words to dictionary IDs")
+    saved_to_db: bool = Field(default=False, description="Flag indicating if results were saved")
+
+class Output(BaseModel):
+    """
+    Output model for language processing workflows.
+    
+    This model represents the output of a language processing workflow.
+    """
+    text_id: int
+    learning_profile_id: int
+    created_words: List[str]
+    created_dictionaries: List[str]
+    created_translations: List[str]
+    created_definitions: List[str]
+    created_examples: List[str]

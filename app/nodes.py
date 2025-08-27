@@ -1,7 +1,11 @@
 from app.generate import generate_translation, generate_definition, generate_examples, codes_language, language_codes
 from langgraph.graph import StateGraph, START, END
 from app.schemas import State, AllRead
-from app.crud import get_synonyms, create_word, create_in_dictionary, create_translation, create_definition, create_example
+from app.crud import get_learning_profile, get_language_id, get_synonyms, create_word, create_in_dictionary, create_translation, create_definition, create_example, create_text
+from app.models import Word, Dictionary
+from sqlalchemy.orm import Session
+from fastapi import HTTPException
+from app.crud_schemas import LearningProfileRead, TextRead, WordBase, DictionaryBase, TranslationBase, DictionaryRead, DefinitionBase, ExampleBase, DefinitionRead, ExampleRead, TranslationRead
 
 def translate_words_node(state: State) -> dict:
     """
@@ -129,16 +133,231 @@ def get_synonyms_node(state: State) -> dict:
 
     return {'synonyms': synonyms}
 
-def save_to_db_node(state: State) -> dict:
+def save_text_node(state: State, context: LearningProfileRead) -> dict:
     """
-    Node: Save the state to the database.
+    Node: Save the input text to the database.
     """
-    for word in state['words']:
-        create_word(word, state['src_language'])
-        create_in_dictionary(word, state['src_language'])
-        create_translation(word, state['tgt_language'])
-        create_definition(word, state['src_language'])
-        create_example(word, state['src_language'])
+
+    
+    db = context.db
+
+    src_language_id = context.primary_language_id
+    tgt_language_id = context.foreign_language_id
+    learning_profile_id = context.learning_profile_id
+    try:
+        text: TextRead = create_text(db, state['text'], learning_profile_id, src_language_id, tgt_language_id)
+        return state
+    except Exception as e:
+        return state
 
 
-    return {'saved_to_db': True}
+def save_words_node(state: State, context: LearningProfileRead) -> dict:
+    """
+    Node: Save words to the database.
+    """
+    from app.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        src_language_id = get_language_id(language_name=context.primary_language)
+        created_words = []
+        existing_words = []
+        word_db_map = {}  # Map words to their database objects
+        
+        for word in state['words']:
+            try:
+                current_word = WordBase(lemma=word, language_id=src_language_id)
+                word_db = create_word(db, current_word)
+                created_words.append(word)
+                word_db_map[word] = word_db
+            except HTTPException as e:
+                if e.status_code == 409:  # Word already exists
+                    word_db = db.query(Word).filter(
+                        Word.lemma == word,
+                        Word.language_id == src_language_id
+                    ).first()
+                    existing_words.append(word)
+                    word_db_map[word] = word_db
+                else:
+                    print(f"Error creating word '{word}': {e}")
+                    continue
+        
+        return {
+            'created_words': created_words,
+            'existing_words': existing_words,
+            'word_db_map': word_db_map
+        }
+    finally:
+        db.close()
+
+def save_dictionary_node(state: State, context: LearningProfileRead) -> dict:
+    """
+    Node: Save dictionary entries to the database.
+    """
+    from app.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        learning_profile_id = context.learning_profile_id
+        word_db_map = state.get('word_db_map', {})
+        created_dictionary_entries = []
+        existing_dictionary_entries = []
+        dictionary_db_map = {}  # Map words to their dictionary objects
+        
+        for word, word_db in word_db_map.items():
+            try:
+                dictionary = DictionaryBase(learning_profile_id=learning_profile_id, word_id=word_db.id)
+                dictionary_db = create_in_dictionary(db, dictionary, context.user)
+                created_dictionary_entries.append(word)
+                dictionary_db_map[word] = dictionary_db
+            except HTTPException as e:
+                if e.status_code == 409:  # Dictionary entry already exists
+                    dictionary_db = db.query(Dictionary).filter(
+                        Dictionary.learning_profile_id == learning_profile_id,
+                        Dictionary.word_id == word_db.id
+                    ).first()
+                    existing_dictionary_entries.append(word)
+                    dictionary_db_map[word] = dictionary_db
+                else:
+                    print(f"Error creating dictionary entry for word '{word}': {e}")
+                    continue
+        
+        return {
+            'created_dictionary_entries': created_dictionary_entries,
+            'existing_dictionary_entries': existing_dictionary_entries,
+            'dictionary_db_map': dictionary_db_map
+        }
+    finally:
+        db.close()
+
+def save_translation_node(state: State, context: LearningProfileRead) -> dict:
+    """
+    Node: Save translations to the database.
+    """
+    from app.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        src_language_id = get_language_id(language_name=context.primary_language)
+        dictionary_db_map = state.get('dictionary_db_map', {})
+        created_translations = []
+        failed_translations = []
+        
+        for word, dictionary_db in dictionary_db_map.items():
+            try:
+                translation = TranslationBase(
+                    translation=state['translations'][word], 
+                    language_id=src_language_id, 
+                    dictionary_id=dictionary_db.id
+                )
+                translation_db = create_translation(db, translation, context.user)
+                created_translations.append(word)
+            except Exception as e:
+                print(f"Error creating translation for word '{word}': {e}")
+                failed_translations.append(word)
+                continue
+        
+        return {
+            'created_translations': created_translations,
+            'failed_translations': failed_translations
+        }
+    finally:
+        db.close()
+
+def save_definition_node(state: State, context: LearningProfileRead) -> dict:
+    """
+    Node: Save definitions to the database.
+    """
+    from app.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        src_language_id = get_language_id(language_name=context.primary_language)
+        dictionary_db_map = state.get('dictionary_db_map', {})
+        created_definitions = []
+        failed_definitions = []
+        
+        for word, dictionary_db in dictionary_db_map.items():
+            try:
+                definition = DefinitionBase(
+                    dictionary_id=dictionary_db.id, 
+                    language_id=src_language_id, 
+                    definition_text=state['definitions'][word]
+                )
+                definition_db = create_definition(db, definition, context.user)
+                created_definitions.append(word)
+            except Exception as e:
+                print(f"Error creating definition for word '{word}': {e}")
+                failed_definitions.append(word)
+                continue
+        
+        return {
+            'created_definitions': created_definitions,
+            'failed_definitions': failed_definitions
+        }
+    finally:
+        db.close()
+
+def save_example_node(state: State, context: LearningProfileRead) -> dict:
+    """
+    Node: Save examples to the database.
+    """
+ 
+    
+    db = context.db
+
+    src_language_id = get_language_id(language_name=context.primary_language)
+    dictionary_db_map = state.get('dictionary_db_map', {})
+    created_examples = []
+    failed_examples = []
+    
+    for word, dictionary_db in dictionary_db_map.items():
+        try:
+            example = ExampleBase(
+                dictionary_id=dictionary_db.id, 
+                language_id=src_language_id, 
+                example_text=state['examples'][word]
+            )
+            example_db = create_example(db, example, context.user)
+            created_examples.append(word)
+        except Exception as e:
+            continue
+    
+    return {
+        'created_examples': created_examples
+    }
+
+
+graph = StateGraph(State, context=LearningProfileRead)
+graph.add_node("translate_words", translate_words_node)
+graph.add_node("generate_definitions", generate_definitions_node)
+graph.add_node("generate_examples", generate_examples_node)
+graph.add_node("get_synonyms", get_synonyms_node)
+graph.add_node("save_text", save_text_node)
+graph.add_node("save_words", save_words_node)
+graph.add_node("save_dictionary", save_dictionary_node)
+graph.add_node("save_translation", save_translation_node)
+graph.add_node("save_definition", save_definition_node)
+graph.add_node("save_example", save_example_node)
+
+graph.add_edge(START, "translate_words")
+graph.add_edge("translate_words", "generate_definitions")
+graph.add_edge("generate_definitions", "generate_examples")
+graph.add_edge("generate_examples", "get_synonyms")
+graph.add_edge("get_synonyms", "save_text")
+graph.add_edge("save_text", "save_words")
+graph.add_edge("save_words", "save_dictionary")
+graph.add_edge("save_dictionary", "save_translation")
+graph.add_edge("save_translation", "save_definition")
+graph.add_edge("save_definition", "save_example")
+graph.add_edge("save_example", END)
+
+graph.add_conditional_edges(
+    "save_example",
+    {
+        "created_examples": "save_example",
+        "failed_examples": "save_example"
+    }
+)
+
+
