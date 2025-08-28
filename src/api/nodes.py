@@ -1,11 +1,11 @@
-from app.generate import generate_translation, generate_definition, generate_examples, codes_language, language_codes
+from src.services.generate import generate_translation, generate_definition, generate_examples, codes_language, language_codes
 from langgraph.graph import StateGraph, START, END
-from app.schemas import State, AllRead
-from app.crud import get_learning_profile, get_language_id, get_synonyms, create_word, create_in_dictionary, create_translation, create_definition, create_example, create_text
-from app.models import Word, Dictionary
+from src.models.schemas import State, AllRead
+from src.services.crud import get_learning_profile, get_language_id, get_synonyms, create_word, create_in_dictionary, create_translation, create_definition, create_example, create_text
+from src.models.models import Word, Dictionary
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from app.crud_schemas import LearningProfileRead, TextRead, WordBase, DictionaryBase, TranslationBase, DictionaryRead, DefinitionBase, ExampleBase, DefinitionRead, ExampleRead, TranslationRead
+from src.models.crud_schemas import LearningProfileRead, TextRead, WordBase, DictionaryBase, TranslationBase, DictionaryRead, DefinitionBase, ExampleBase, DefinitionRead, ExampleRead, TranslationRead
 
 def translate_words_node(state: State) -> dict:
     """
@@ -150,12 +150,11 @@ def save_text_node(state: State, context: LearningProfileRead) -> dict:
     except Exception as e:
         return state
 
-
 def save_words_node(state: State, context: LearningProfileRead) -> dict:
     """
     Node: Save words to the database.
     """
-    from app.database import SessionLocal
+    from src.core.database import SessionLocal
     
     db = SessionLocal()
     try:
@@ -194,7 +193,7 @@ def save_dictionary_node(state: State, context: LearningProfileRead) -> dict:
     """
     Node: Save dictionary entries to the database.
     """
-    from app.database import SessionLocal
+    from src.core.database import SessionLocal
     
     db = SessionLocal()
     try:
@@ -234,7 +233,7 @@ def save_translation_node(state: State, context: LearningProfileRead) -> dict:
     """
     Node: Save translations to the database.
     """
-    from app.database import SessionLocal
+    from src.core.database import SessionLocal
     
     db = SessionLocal()
     try:
@@ -268,7 +267,7 @@ def save_definition_node(state: State, context: LearningProfileRead) -> dict:
     """
     Node: Save definitions to the database.
     """
-    from app.database import SessionLocal
+    from src.core.database import SessionLocal
     
     db = SessionLocal()
     try:

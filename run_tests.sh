@@ -79,12 +79,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         --coverage)
             COVERAGE=true
-            TEST_COMMAND="pytest --cov=app --cov-report=term-missing"
+            TEST_COMMAND="pytest --cov=src --cov-report=term-missing"
             shift
             ;;
         --html)
             COVERAGE=true
-            TEST_COMMAND="pytest --cov=app --cov-report=html --cov-report=term-missing"
+            TEST_COMMAND="pytest --cov=src --cov-report=html --cov-report=term-missing"
             shift
             ;;
         --help)

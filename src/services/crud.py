@@ -5,26 +5,24 @@ from sqlalchemy.orm import Session, selectinload
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
-from app.crud_schemas import (
+from src.models.crud_schemas import (
     WordBase, WordRead, DictionaryBase, DictionaryRead, TranslationBase, TranslationRead,
     DefinitionBase, DefinitionRead, ExampleBase, ExampleRead, TextBase, TextRead,
     LearningProfileBase, LearningProfileRead, UserBase, UserUpdate, Token, UserCreate, UserRead,
     LanguageBase, LanguageRead
 )
-from app.models import (
+from src.models.models import (
     User, Language, Word, LearningProfile, Dictionary, Translation, Definition, Example, Text
 )
-from app.database import get_db
-from app import auth
+from src.core.database import get_db
+from src.services import auth
 from datetime import timedelta
-from app.generate import embed, language_codes
+from src.services.generate import embed, language_codes
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import func, aliased
-
-db_dependency = Annotated[Session, Depends(get_db)]
+from sqlalchemy import func, alias
 
 
-def register_user(db: db_dependency, payload: UserCreate) -> UserRead:
+def register_user(db: Session, payload: UserCreate) -> UserRead:
     email_norm = payload.email.strip().lower()
     existing_user = db.query(User).filter(
         (User.username == payload.username) | (User.email == email_norm)
@@ -44,7 +42,7 @@ def register_user(db: db_dependency, payload: UserCreate) -> UserRead:
     return UserRead.model_validate(db_user)
 
 
-def login(db: db_dependency, username: str, password: str) -> Token:
+def login(db: Session, username: str, password: str) -> Token:
     user = auth.authenticate_user(db, username, password)
     if not user:
         raise HTTPException(
@@ -59,7 +57,7 @@ def login(db: db_dependency, username: str, password: str) -> Token:
     return Token(access_token=access_token, token_type="bearer")
 
 
-def get_user_info(db: db_dependency, user_id: Optional[int] = None, username: Optional[str] = None) -> UserRead:
+def get_user_info(db: Session, user_id: Optional[int] = None, username: Optional[str] = None) -> UserRead:
     if user_id and username:
         user = db.query(User).filter((User.username == username) & (User.id == user_id)).first()
     elif user_id:
@@ -73,7 +71,7 @@ def get_user_info(db: db_dependency, user_id: Optional[int] = None, username: Op
     return UserRead.model_validate(user)
 
 
-def delete_current_user(db: db_dependency, current_user: User, hard: bool) -> None:
+def delete_current_user(db: Session, current_user: User, hard: bool) -> None:
     if not hard:
         if not current_user.disabled:
             current_user.disabled = True
@@ -91,7 +89,7 @@ def delete_current_user(db: db_dependency, current_user: User, hard: bool) -> No
         )
 
 
-def create_language(db: db_dependency, language: LanguageBase) -> LanguageRead:
+def create_language(db: Session, language: LanguageBase) -> LanguageRead:
     code = language_codes.get(language.name)
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid language")
@@ -110,7 +108,7 @@ def create_language(db: db_dependency, language: LanguageBase) -> LanguageRead:
 
 
 def create_learning_profile(
-    db: db_dependency, 
+    db: Session, 
     learning_profile: LearningProfileBase, 
     current_user: Annotated[User, Depends(auth.get_current_active_user)]
 ) -> LearningProfileRead:
@@ -139,7 +137,7 @@ def create_learning_profile(
 
 
 def create_word(
-    db: db_dependency, 
+    db: Session, 
     word: WordBase
     ) -> WordRead:
     language = db.query(Language).filter(Language.id == word.language_id).first()
@@ -171,7 +169,7 @@ def create_word(
 
 
 def create_in_dictionary(
-    db: db_dependency, dictionary: DictionaryBase, current_user: Annotated[User, Depends(auth.get_current_active_user)]
+    db: Session, dictionary: DictionaryBase, current_user: Annotated[User, Depends(auth.get_current_active_user)]
 ) -> DictionaryRead:
     lp = (
         db.query(LearningProfile)
@@ -203,7 +201,7 @@ def create_in_dictionary(
 
 
 def create_translation(
-    db: db_dependency, 
+    db: Session, 
     translation: TranslationBase, 
     current_user: Annotated[User, Depends(auth.get_current_active_user)]
 ) -> TranslationRead:
@@ -253,7 +251,7 @@ def create_text(
     db.refresh(new_text)
     return TextRead.model_validate(new_text, from_attributes=True)
 
-def create_definition(db: db_dependency, definition: DefinitionBase) -> DefinitionRead:
+def create_definition(db: Session, definition: DefinitionBase) -> DefinitionRead:
     try:
         definition_db = Definition(**definition.model_dump())
         db.add(definition_db)
@@ -265,7 +263,7 @@ def create_definition(db: db_dependency, definition: DefinitionBase) -> Definiti
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not create definition: {str(e)}")
 
 def create_example(
-    db: db_dependency, 
+    db: Session, 
     example: ExampleBase
 ) -> ExampleRead:
     try:
@@ -336,14 +334,14 @@ def get_synonyms(
     return [WordRead.model_validate(w, from_attributes=True) for w in neighbors]
 
 def get_learning_profile(
-    db: db_dependency, 
+    db: Session, 
     primary_language: str,
     foreign_language: str,
     current_user: Annotated[User, Depends(auth.get_current_active_user)]
     ) -> LearningProfileRead:
     # Use aliases for the two language joins
-    PrimaryLanguage = aliased(Language)
-    ForeignLanguage = aliased(Language)
+    PrimaryLanguage = alias(Language)
+    ForeignLanguage = alias(Language)
     
     learning_profile = (
         db.query(LearningProfile)
@@ -362,7 +360,7 @@ def get_learning_profile(
         
     return LearningProfileRead.model_validate(learning_profile, from_attributes=True)
 
-def get_language_id(db: db_dependency, language_name: Optional[str]=None, language_code: Optional[str]=None) -> int:
+def get_language_id(db: Session, language_name: Optional[str]=None, language_code: Optional[str]=None) -> int:
 
     if language_name:
         language = db.query(Language).filter(Language.name == language_name).first()
@@ -588,7 +586,7 @@ def update_example(
     db.refresh(example)
     return ExampleRead.model_validate(example, from_attributes=True)
 
-def update_current_user(db: db_dependency, current_user: User, payload: UserUpdate) -> UserRead:
+def update_current_user(db: Session, current_user: User, payload: UserUpdate) -> UserRead:
     if (
         payload.username is None
         and payload.full_name is None

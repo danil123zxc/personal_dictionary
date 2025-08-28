@@ -1,23 +1,38 @@
 from typing import List, Optional, Dict, Tuple, Any, Union, Set, Annotated
 import json
-from app.prompts import *
+from src.api.prompts import *
 from fastapi import FastAPI, HTTPException, Query, Body, Depends, status
-from app.generate import generate_translation, generate_definition, generate_examples, language_codes, codes_language, llm, embed
-from app.database import Base, engine, get_db
-from app.models import *
-from app.crud import get_learning_profile
-from app.schemas import TranslationRead as SchemaTranslationRead, ExamplesRead as SchemaExamplesRead, DefinitionRead as SchemaDefinitionRead, TranslationResponse, TranslationInput, ExamplesInput, DefinitionInput
+from src.services.generate import generate_translation, generate_definition, generate_examples, language_codes, codes_language, llm, embed
+from src.core.database import Base, engine, get_db
+from src.models import *
+from src.services.crud import get_learning_profile
+from src.models.schemas import TranslationRead as SchemaTranslationRead, ExamplesRead as SchemaExamplesRead, DefinitionRead as SchemaDefinitionRead, TranslationResponse, TranslationInput, ExamplesInput, DefinitionInput
 from sqlalchemy.orm import Session, selectinload
-from app.crud_schemas import (
+from src.models.crud_schemas import (
     WordBase, WordRead, DictionaryBase, DictionaryRead, TranslationBase, TranslationRead, DefinitionBase, DefinitionRead,
     ExampleBase, ExampleRead, TextBase, TextRead, LearningProfileBase, LearningProfileRead, 
     UserBase, UserUpdate, Token, UserCreate, UserRead, LanguageBase, LanguageRead)
 from fastapi.security import OAuth2PasswordRequestForm
 import os
-from app import auth
+from src.services import auth
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
-from app import crud
+from src.services import crud
+from src.core.redis_dependency import get_redis
+from src.core.redis_client import RedisClient
+from src.core.logging_config import setup_logging, get_logger
+from src.config.settings import settings
+
+# Setup logging
+setup_logging(
+    log_level=settings.LOG_LEVEL,
+    log_file=settings.LOG_FILE,
+    max_bytes=settings.LOG_MAX_BYTES,
+    backup_count=settings.LOG_BACKUP_COUNT
+)
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 # Initialize FastAPI application with metadata for Swagger documentation
 app = FastAPI(
@@ -29,15 +44,15 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Type alias for database session dependency
-db_dependency = Annotated[Session, Depends(get_db)]
+logger.info("FastAPI application initialized")
+
 
 # -----------------------------------------------------------------------------
 # Authentication & User Management Endpoints
 # -----------------------------------------------------------------------------
 
 @app.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def register_user(payload: UserCreate, db: db_dependency) -> UserRead:
+def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> UserRead:
     """
     Register a new user in the system.
     
@@ -69,7 +84,7 @@ def register_user(payload: UserCreate, db: db_dependency) -> UserRead:
     return crud.register_user(db, payload)
 
 @app.post("/login", response_model=Token, status_code=status.HTTP_200_OK)
-def login(db: db_dependency, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
+def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Session = Depends(get_db)) -> Token:
     """
     Authenticate user and issue JWT access token.
     
@@ -116,7 +131,7 @@ def read_user_me(current_user: Annotated[User, Depends(auth.get_current_active_u
     return UserRead.model_validate(current_user)  
 
 @app.get("/users/", response_model=UserRead)
-def get_user_info(db: db_dependency, 
+def get_user_info(db: Session = Depends(get_db), 
                   user_id: Optional[int] = None, 
                   username: Optional[str] = None) -> UserRead:
     """
@@ -145,9 +160,9 @@ def get_user_info(db: db_dependency,
 
 @app.put("/update_user/me", response_model=UserRead)
 def update_current_user(
+    payload: UserUpdate,
     current_user: Annotated[User, Depends(auth.get_current_active_user)], 
-    db: db_dependency,
-    payload: UserUpdate
+    db: Session = Depends(get_db)
 ) -> UserRead:
     """
     Update current user's profile information.
@@ -180,7 +195,7 @@ def update_current_user(
 @app.delete("/user_delete/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_current_user(
     current_user: Annotated[User, Depends(auth.get_current_active_user)],
-    db: db_dependency,
+    db: Session = Depends(get_db),
     hard: bool = Query(
         False,
         description="If true, attempt a hard delete (requires FK cascades). Otherwise performs a soft delete by setting disabled=True."
@@ -215,7 +230,7 @@ def delete_current_user(
 # -----------------------------------------------------------------------------
 
 @app.post("/create_language", response_model=LanguageRead, status_code=status.HTTP_201_CREATED)
-def create_language(language: LanguageBase, db: db_dependency) -> LanguageRead:
+def create_language(language: LanguageBase, db: Session = Depends(get_db)) -> LanguageRead:
     """
     Create a new language in the system.
     
@@ -246,9 +261,9 @@ def create_language(language: LanguageBase, db: db_dependency) -> LanguageRead:
 
 @app.post("/create_learning_profile", response_model=LearningProfileRead, status_code=status.HTTP_201_CREATED)
 def create_learning_profile(
-    db: db_dependency,
     learning_profile: LearningProfileBase, 
-    current_user: Annotated[User, Depends(auth.get_current_active_user)]
+    current_user: Annotated[User, Depends(auth.get_current_active_user)],
+    db: Session = Depends(get_db)
 ) -> LearningProfileRead:
     """
     Create a learning profile for the current user.
@@ -283,7 +298,7 @@ def create_learning_profile(
 # -----------------------------------------------------------------------------
 
 @app.post("/create_word", response_model=WordRead, status_code=status.HTTP_201_CREATED)
-def create_word(word: WordBase, db: db_dependency) -> WordRead:
+def create_word(word: WordBase, db: Session = Depends(get_db)) -> WordRead:
     """
     Create a new word in the system.
     
@@ -318,7 +333,7 @@ def create_word(word: WordBase, db: db_dependency) -> WordRead:
 def create_in_dictionary(
     dictionary: DictionaryBase,
     current_user: Annotated[User, Depends(auth.get_current_active_user)],
-    db: db_dependency,
+    db: Session = Depends(get_db),
 ) -> DictionaryRead:
     """
     Add a word to the user's personal dictionary.
@@ -356,7 +371,7 @@ def create_in_dictionary(
 def create_translation(
     translation: TranslationBase,
     current_user: Annotated[User, Depends(auth.get_current_active_user)],
-    db: db_dependency,
+    db: Session = Depends(get_db),
 ) -> TranslationRead:
     """
     Create a translation for a dictionary entry.
@@ -506,4 +521,290 @@ def examples(text: ExamplesInput):
         return generate_examples(text.word, text.language, text.examples_number, text.definition)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating examples: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# Redis Cache Endpoints
+# -----------------------------------------------------------------------------
+
+# Redis dependency
+
+@app.post("/cache/set")
+def set_cache_data(
+    key: str = Body(..., embed=True),
+    value: Any = Body(..., embed=True),
+    expiration: Optional[int] = Body(3600, embed=True),  # Default 1 hour
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Set data in Redis cache.
+    
+    Args:
+        key: Cache key
+        value: Value to cache
+        expiration: Expiration time in seconds (default: 3600)
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Operation result
+    """
+    success = redis.set(key, value, ex=expiration)
+    return {
+        "success": success,
+        "key": key,
+        "expiration": expiration
+    }
+
+@app.get("/cache/get/{key}")
+def get_cache_data(
+    key: str,
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Get data from Redis cache.
+    
+    Args:
+        key: Cache key
+        redis: Redis client dependency
+        
+    Returns:
+        Any: Cached value or None if not found
+    """
+    value = redis.get(key)
+    return {
+        "key": key,
+        "value": value,
+        "exists": value is not None
+    }
+
+@app.delete("/cache/delete/{key}")
+def delete_cache_data(
+    key: str,
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Delete data from Redis cache.
+    
+    Args:
+        key: Cache key
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Operation result
+    """
+    deleted_count = redis.delete(key)
+    return {
+        "success": deleted_count > 0,
+        "key": key,
+        "deleted_count": deleted_count
+    }
+
+@app.get("/cache/exists/{key}")
+def check_cache_exists(
+    key: str,
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Check if a key exists in Redis cache.
+    
+    Args:
+        key: Cache key
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Existence check result
+    """
+    exists_count = redis.exists(key)
+    ttl = redis.ttl(key) if exists_count > 0 else -2
+    
+    return {
+        "key": key,
+        "exists": exists_count > 0,
+        "ttl": ttl
+    }
+
+@app.post("/cache/hash/set")
+def set_hash_data(
+    hash_name: str = Body(..., embed=True),
+    data: Dict[str, Any] = Body(..., embed=True),
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Set hash data in Redis cache.
+    
+    Args:
+        hash_name: Hash name
+        data: Dictionary of field-value pairs
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Operation result
+    """
+    fields_set = redis.hset(hash_name, data)
+    return {
+        "success": fields_set > 0,
+        "hash_name": hash_name,
+        "fields_set": fields_set
+    }
+
+@app.get("/cache/hash/get/{hash_name}")
+def get_hash_data(
+    hash_name: str,
+    field: Optional[str] = Query(None),
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Get hash data from Redis cache.
+    
+    Args:
+        hash_name: Hash name
+        field: Specific field to get (optional, gets all if not specified)
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Hash data
+    """
+    if field:
+        value = redis.hget(hash_name, field)
+        return {
+            "hash_name": hash_name,
+            "field": field,
+            "value": value,
+            "exists": value is not None
+        }
+    else:
+        data = redis.hgetall(hash_name)
+        return {
+            "hash_name": hash_name,
+            "data": data,
+            "field_count": len(data)
+        }
+
+@app.post("/cache/list/push")
+def push_to_list(
+    list_name: str = Body(..., embed=True),
+    values: List[Any] = Body(..., embed=True),
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Push values to a Redis list.
+    
+    Args:
+        list_name: List name
+        values: Values to push
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Operation result
+    """
+    pushed_count = redis.lpush(list_name, *values)
+    return {
+        "success": pushed_count > 0,
+        "list_name": list_name,
+        "pushed_count": pushed_count
+    }
+
+@app.get("/cache/list/get/{list_name}")
+def get_list_data(
+    list_name: str,
+    start: int = Query(0),
+    end: int = Query(-1),
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Get data from a Redis list.
+    
+    Args:
+        list_name: List name
+        start: Start index
+        end: End index
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: List data
+    """
+    data = redis.lrange(list_name, start, end)
+    return {
+        "list_name": list_name,
+        "data": data,
+        "count": len(data),
+        "range": f"{start}:{end}"
+    }
+
+@app.post("/cache/set/add")
+def add_to_set(
+    set_name: str = Body(..., embed=True),
+    values: List[Any] = Body(..., embed=True),
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Add values to a Redis set.
+    
+    Args:
+        set_name: Set name
+        values: Values to add
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Operation result
+    """
+    added_count = redis.sadd(set_name, *values)
+    return {
+        "success": added_count > 0,
+        "set_name": set_name,
+        "added_count": added_count
+    }
+
+@app.get("/cache/set/get/{set_name}")
+def get_set_data(
+    set_name: str,
+    redis: RedisClient = Depends(get_redis)
+):
+    """
+    Get data from a Redis set.
+    
+    Args:
+        set_name: Set name
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Set data
+    """
+    data = redis.smembers(set_name)
+    return {
+        "set_name": set_name,
+        "data": list(data),
+        "count": len(data)
+    }
+
+@app.get("/cache/health")
+def redis_health_check(redis: RedisClient = Depends(get_redis)):
+    """
+    Health check for Redis connection.
+    
+    Args:
+        redis: Redis client dependency
+        
+    Returns:
+        Dict: Health status
+    """
+    try:
+        # Test connection by setting and getting a test key
+        test_key = "health_check_test"
+        test_value = {"status": "healthy", "timestamp": "2024-01-01T00:00:00Z"}
+        
+        redis.set(test_key, test_value, ex=10)  # Expire in 10 seconds
+        retrieved_value = redis.get(test_key)
+        redis.delete(test_key)
+        
+        return {
+            "status": "healthy",
+            "redis_url": redis.url,
+            "test_passed": retrieved_value == test_value
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "redis_url": redis.url
+        }
 

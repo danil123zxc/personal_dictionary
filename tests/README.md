@@ -24,6 +24,32 @@ Shared pytest fixtures for:
 - Authentication headers
 - Mock embedding responses
 
+### `test_redis.py`
+Redis functionality tests:
+- Connection testing
+- Basic operations (set/get, hashes, lists, sets)
+- Error handling
+- Performance testing
+
+### `test_structure_only.py`
+Project structure validation:
+- Directory structure verification
+- Import syntax checking
+- Old import detection
+- New import verification
+
+### `test_new_structure.py`
+Comprehensive structure testing:
+- Import functionality testing
+- Settings configuration testing
+- Directory structure validation
+
+### `test_structure_simple.py`
+Simple structure organization test:
+- Test file organization verification
+- Example file organization verification
+- Configuration file placement
+
 ## Running Tests
 
 ### Install Test Dependencies
@@ -53,7 +79,7 @@ pytest -m auth
 
 ### Run with Coverage
 ```bash
-pytest --cov=app --cov-report=html
+pytest --cov=src --cov-report=html
 ```
 
 ### Run Specific Test File
@@ -64,6 +90,18 @@ pytest tests/test_crud.py
 ### Run Specific Test Function
 ```bash
 pytest tests/test_crud.py::TestUserFunctions::test_register_user_success
+```
+
+### Run Structure Tests (No Dependencies Required)
+```bash
+# Test project structure organization
+python3 tests/test_structure_simple.py
+
+# Test structure and imports (requires dependencies)
+python3 tests/test_structure_only.py
+
+# Test Redis functionality
+python3 tests/test_redis.py
 ```
 
 ## Test Features

@@ -1,10 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-import os
+from src.config.settings import settings
+from typing import Annotated
+from sqlalchemy.orm import Session
+from fastapi import Depends
 
-# Database connection URL from environment variable
-# Expected format: postgresql://user:password@host:port/database
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Database connection URL from settings
+DATABASE_URL = settings.DATABASE_URL
 
 # Create SQLAlchemy engine with echo=True for debugging SQL queries
 # future=True enables SQLAlchemy 2.0 style features
@@ -51,3 +53,6 @@ def get_db():
     finally:
         # Always close the session, even if an exception occurs
         db.close()
+
+# For backward compatibility - use Depends(get_db) directly in function signatures
+# Example: db: Session = Depends(get_db)

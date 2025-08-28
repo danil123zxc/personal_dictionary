@@ -30,17 +30,17 @@ Security Features:
 
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
+from pathlib import Path
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
-from app.models import User
-from app.crud_schemas import UserBase, Token, TokenData
-from pathlib import Path
 from dotenv import load_dotenv
-import os
-from app.database import get_db
+from src.models.models import User
+from src.models.crud_schemas import UserBase, Token, TokenData
+from src.config.settings import settings
+from src.core.database import get_db
 from sqlalchemy.orm import Session
 
 # Password hashing context using bcrypt
@@ -58,13 +58,11 @@ env_path = root_dir / '.env'
 # Load the .env file from root directory
 load_dotenv(dotenv_path=env_path)
 
-# JWT configuration from environment variables
-SECRET_KEY = os.getenv("SECRET_KEY")
+# JWT configuration from settings
+SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"  # HMAC with SHA-256
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Default token expiration time
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-# Type alias for database session dependency
-db_dependency = Annotated[Session, Depends(get_db)]
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
@@ -106,7 +104,7 @@ def get_password_hash(password: str) -> str:
     """
     return pwd_context.hash(password)
 
-def get_user(db: db_dependency, username: str) -> User | None:
+def get_user(db: Session, username: str) -> User | None:
     """
     Retrieve a user from the database by username.
     
@@ -128,7 +126,7 @@ def get_user(db: db_dependency, username: str) -> User | None:
     user = db.query(User).filter(User.username == username).first()
     return user
 
-def authenticate_user(db: db_dependency, username: str, password: str) -> User | bool:
+def authenticate_user(db: Session, username: str, password: str) -> User | bool:
     """
     Authenticate a user with username and password.
     

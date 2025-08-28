@@ -1,11 +1,9 @@
 from pydantic import Field, BaseModel, EmailStr, field_validator, ValidationInfo, RootModel
 
 from typing import List, Optional, Dict, Any, Set, TypedDict
-from app.crud_schemas import WordBase
-from app.database import get_db
-from app.crud_schemas import LearningProfileRead
-from sqlalchemy.orm import Session
-from fastapi import Depends
+from src.models.crud_schemas import WordBase
+from src.core.database import get_db
+from src.models.crud_schemas import LearningProfileRead
 
 class TranslationResponse(RootModel[Dict[str, List[str]]]):
     """
@@ -134,7 +132,7 @@ class Context(LearningProfileRead):
     This model extends LearningProfileRead to include additional context
     for language processing workflows.
     """
-    db: Session = Depends(get_db)
+    pass
 
 class State(TypedDict):
     """

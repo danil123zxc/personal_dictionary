@@ -3,7 +3,7 @@ from sqlalchemy import (
 )
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship, validates
-from app.database import Base
+from src.core.database import Base
 
 # Vector embedding dimension for pgvector
 # This should match the embedding model's output dimension

@@ -1,11 +1,11 @@
 from langchain_ollama import ChatOllama
 from langchain.prompts import ChatPromptTemplate
-from app.schemas import TranslationResponse, DefinitionResponse, ExamplesResponse, DefinitionRead, ExamplesRead, TranslationRead
+from src.models.schemas import TranslationResponse, DefinitionResponse, ExamplesResponse, DefinitionRead, ExamplesRead, TranslationRead
 from typing import Optional
 from dotenv import load_dotenv
 from langsmith import traceable
 from pathlib import Path
-from app.prompts import translation_prompt, definition_prompt, example_prompt
+from src.api.prompts import translation_prompt, definition_prompt, example_prompt
 from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import os
