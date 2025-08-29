@@ -157,7 +157,8 @@ class State(TypedDict):
         created_words: List of words that were successfully created
         existing_words: List of words that already existed in the database  
     """
-    text: str  
+    text: str 
+    chunks: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping chunks to words")
     words: Set[str] = Field(default_factory=set, description="Set of extracted words")
     translations: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping words to translations")
     definitions: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping words to definitions")
@@ -165,7 +166,6 @@ class State(TypedDict):
     examples_number: Dict[str, int] = Field(default_factory=dict, description="Dictionary mapping words to number of examples")
     synonyms: Dict[str, List[str]] = Field(default_factory=dict, description="Dictionary mapping words to similar words")
     dictionaries: Dict[str, int] = Field(default_factory=dict, description="Dictionary mapping words to dictionary IDs")
-    saved_to_db: bool = Field(default=False, description="Flag indicating if results were saved")
 
 class Output(BaseModel):
     """

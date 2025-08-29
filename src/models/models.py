@@ -1,13 +1,30 @@
 from sqlalchemy import (
-    Boolean, Column, Integer, String, Text, ForeignKey, CHAR, Table, DateTime, func, CheckConstraint, UniqueConstraint
+    Boolean, Column, Integer, String, Text, ForeignKey, CHAR, Table, DateTime, func, CheckConstraint, UniqueConstraint, Enum
 )
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship, validates
 from src.core.database import Base
+import enum
 
 # Vector embedding dimension for pgvector
 # This should match the embedding model's output dimension
 EMB_DIM = 384
+
+class PartOfSpeech(enum.Enum):
+    """Part of Speech enumeration for words."""
+    NOUN = "NOUN"
+    VERB = "VERB"
+    ADJ = "ADJ"
+    ADV = "ADV"
+    PRON = "PRON"
+    DET = "DET"
+    ADP = "ADP"
+    NUM = "NUM"
+    CONJ = "CONJ"
+    PART = "PART"
+    INTJ = "INTJ"
+    PUNCT = "PUNCT"
+    X = "X"  # Other/unknown
 
 class EmbeddingMixin:
     """
@@ -158,6 +175,7 @@ class Word(Base, TimestampMixin, EmbeddingMixin):
     __tablename__ = 'words'
     id = Column(Integer, primary_key=True, index=True)
     lemma = Column(String, index=True, nullable=False)  # Base form of the word
+    pos = Column(Enum(PartOfSpeech), index=True, nullable=True)  # Part of speech
     language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
 
     # Relationships

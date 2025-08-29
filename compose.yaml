@@ -1,4 +1,7 @@
+version: '3.8'
+
 services:
+  # Database
   db:
     container_name: db
     image: pgvector/pgvector:pg16
@@ -6,7 +9,7 @@ services:
     environment:
       - POSTGRES_DB=dictionary
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
     volumes:
       - db-data:/var/lib/postgresql/data  
       - ./db/init:/docker-entrypoint-initdb.d
@@ -18,7 +21,10 @@ services:
       timeout: 5s
       retries: 40
       start_period: 60s
+    networks:
+      - app-network
 
+  # Redis Cache
   redis:
     container_name: redis
     image: redis:7-alpine
@@ -34,8 +40,10 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    networks:
+      - app-network
 
-
+  # Ollama LLM
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
@@ -48,7 +56,10 @@ services:
       timeout: 3s
       retries: 60
       start_period: 30s
+    networks:
+      - app-network
 
+  # Development Server
   server:
     container_name: server
     build:
@@ -65,13 +76,13 @@ services:
       ollama:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/dictionary
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/dictionary
       - REDIS_URL=redis://redis:6379/0
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=gemma3n
-      - LANGCHAIN_TRACING_V2=${LANGSMITH_TRACING}
-      - LANGCHAIN_ENDPOINT=${LANGSMITH_ENDPOINT}
-      - LANGCHAIN_API_KEY=${LANGSMITH_API_KEY}
+      - LANGCHAIN_TRACING_V2=${LANGSMITH_TRACING:-false}
+      - LANGCHAIN_ENDPOINT=${LANGSMITH_ENDPOINT:-}
+      - LANGCHAIN_API_KEY=${LANGSMITH_API_KEY:-}
       - PYTHONUNBUFFERED=1
       - HF_HOME=/app/.cache/huggingface
       - SENTENCE_TRANSFORMERS_HOME=/app/.cache/sentence-transformers
@@ -86,6 +97,36 @@ services:
       --host 0.0.0.0
       --port 8000
       --reload
+    networks:
+      - app-network
+
+  # Production Server
+  server-prod:
+    container_name: server-prod
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: production
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/dictionary
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    env_file: 
+      - .env
+    profiles:
+      - production
+    networks:
+      - app-network
+
+  # Test Runner
   test:
     container_name: test
     build:
@@ -97,11 +138,23 @@ services:
     environment:
       - PYTHONPATH=/app
       - TESTING=true
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/dictionary
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     command: pytest -v
+    profiles:
+      - test
+    networks:
+      - app-network
 
 volumes:
   db-data:
-  redis-data:    
+  redis-data:
+
+networks:
+  app-network:
+    driver: bridge    

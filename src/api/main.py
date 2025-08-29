@@ -1,6 +1,5 @@
 from typing import List, Optional, Dict, Tuple, Any, Union, Set, Annotated
 import json
-from src.api.prompts import *
 from fastapi import FastAPI, HTTPException, Query, Body, Depends, status
 from src.services.generate import generate_translation, generate_definition, generate_examples, language_codes, codes_language, llm, embed
 from src.core.database import Base, engine, get_db
@@ -22,6 +21,8 @@ from src.core.redis_dependency import get_redis
 from src.core.redis_client import RedisClient
 from src.core.logging_config import setup_logging, get_logger
 from src.config.settings import settings
+from src.api.nodes import graph, State
+from langgraph.graph import START, END
 
 # Setup logging
 setup_logging(
@@ -807,4 +808,61 @@ def redis_health_check(redis: RedisClient = Depends(get_redis)):
             "error": str(e),
             "redis_url": redis.url
         }
+
+@app.post("/process_text", response_model=Dict[str, Any])
+def process_text_workflow(
+    text: str,
+    src_language: str,
+    tgt_language: str,
+    current_user: Annotated["User", Depends(auth.get_current_active_user)],
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Process text through the complete LangGraph workflow.
+    
+    This endpoint:
+    1. Extracts words from text
+    2. Translates words
+    3. Generates definitions and examples
+    4. Saves everything to database using tool nodes
+    
+    Args:
+        text (str): Input text to process
+        src_language (str): Source language code (e.g., "en", "ru")
+        tgt_language (str): Target language code (e.g., "ko", "es")
+        current_user (User): Current authenticated user
+        db (Session): Database session
+        
+    Returns:
+        Dict[str, Any]: Processing results
+    """
+    # Get user's learning profile
+    learning_profile = get_learning_profile(db, current_user)
+    
+    # Initialize state
+    initial_state = {
+        'text': text,
+        'src_language': src_language,
+        'tgt_language': tgt_language,
+        'words': set(),
+        'translations': {},
+        'definitions': {},
+        'examples': {},
+        'examples_number': {},
+        'similar_words': {},
+        'saved_to_json': False
+    }
+    
+    # Compile and run the graph
+    compiled_graph = graph.compile()
+    result = compiled_graph.invoke(initial_state, config={"configurable": {"context": learning_profile}})
+    
+    return {
+        "status": "success",
+        "processed_words": len(result.get('words', set())),
+        "translations": result.get('translations', {}),
+        "definitions": result.get('definitions', {}),
+        "examples": result.get('examples', {}),
+        "saved_to_database": True
+    }
 

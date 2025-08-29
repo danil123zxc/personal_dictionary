@@ -1,5 +1,6 @@
 from pydantic import ConfigDict, Field, BaseModel, EmailStr, ValidationInfo, RootModel, model_validator
 from typing import List, Optional, Dict, Any, Set, TypedDict
+from src.models.models import PartOfSpeech
 
 #User
 class UserBase(BaseModel):
@@ -47,6 +48,7 @@ class LanguageRead(LanguageBase):
 #Word
 class WordBase(BaseModel):
     lemma: str = Field(..., min_length=1, max_length=255)
+    pos: Optional[PartOfSpeech] = None
     language_id: int
 
 

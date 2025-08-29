@@ -5,7 +5,6 @@ from typing import Optional
 from dotenv import load_dotenv
 from langsmith import traceable
 from pathlib import Path
-from src.api.prompts import translation_prompt, definition_prompt, example_prompt
 from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import os
@@ -16,7 +15,7 @@ from langsmith import traceable
 from langchain_core.documents import Document
 from sqlalchemy.engine import Engine
 import os
-import math
+
 
 # Get the root directory (parent of app directory)
 root_dir = Path(__file__).parent.parent
@@ -79,12 +78,12 @@ codes_language = {
 }
 
 @traceable(name='translations')
-def generate_translation(text: str, src_language: str, tgt_language: str) -> dict:
+def generate_translation(context: str, src_language: str, tgt_language: str, words: List[str]) -> dict:
     """
     Generate translations in a given text from the source language to the target language.
 
     Args:
-        text (str): The input text containing one or more sentences to translate.
+        context (str): The input text containing one or more sentences to translate.
         src_language (str): The language of the original text (source language).
         tgt_language (str): The language into which the text will be translated (target language).
 
@@ -104,20 +103,21 @@ def generate_translation(text: str, src_language: str, tgt_language: str) -> dic
     """
     # Create a translation prompt using ChatPromptTemplate
     prompt = ChatPromptTemplate.from_messages([
-        ('system', translation_prompt),
-        ('human', 'Text: {text}')
+        ('system', "Translate each lemma from {src_language} to {tgt_language}."),
+        ('human', "Words: {words}, Text: {context}")
     ])
 
     # Format the prompt with provided variables
     messages = prompt.format_messages(
-        text=text,
+        context=context,
         src_language=src_language,
         tgt_language=tgt_language,
+        words=words
     )
     structured_llm = llm.with_structured_output(TranslationResponse)
     # Use the LLM to generate the translation
     response = structured_llm.invoke(messages)
-    structured_output = TranslationRead(words=response, text=text, src_language=src_language, tgt_language=tgt_language)
+    structured_output = TranslationRead(words=response, context=context, src_language=src_language, tgt_language=tgt_language)
     return structured_output
 
 @traceable(name='definitions')
@@ -138,7 +138,7 @@ def generate_definition(word: str, language: str,  context: Optional[str]=None) 
     """
     # Create a definition prompt using PromptTemplate
     prompt = ChatPromptTemplate.from_messages([
-        ('system', definition_prompt),
+        ('system', "Generate a single definition for the word in {language}, based only on its meaning in the given context"),
         ('human', 'Word: {word}, Context: {context}')
     ])
     
@@ -172,7 +172,7 @@ def generate_examples(word: str, language: str, examples_number: int = 1, defini
     """
     # Create an example prompt using ChatPromptTemplate
     prompt = ChatPromptTemplate.from_messages([
-        ('system', example_prompt), 
+        ('system', "Generate {examples_number} simple sentences for the word in {language}. Look at this definition to understand the meaning of the word."), 
         ('human', 'Definition: {definition}, Word: {word}')
     ])
     # Format the prompt with the provided variables
